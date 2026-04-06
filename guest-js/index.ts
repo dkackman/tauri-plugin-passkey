@@ -9,6 +9,36 @@ import { listen, UnlistenFn } from '@tauri-apps/api/event';
 
 export * as types from '@simplewebauthn/types';
 
+// MARK: - PRF Extension Types
+
+/** PRF (hmac-secret) extension output from an authentication ceremony. */
+export interface PrfOutput {
+  /** 32-byte PRF result (base64url-encoded) */
+  first: string;
+  /** Optional second PRF result (base64url-encoded) */
+  second?: string;
+}
+
+/** Extended registration response that may include PRF support info. */
+export type RegistrationResponseWithPrf = RegistrationResponseJSON & {
+  extensions?: {
+    /** Whether the authenticator supports hmac-secret/PRF */
+    hmac_create_secret?: boolean;
+    [key: string]: unknown;
+  };
+};
+
+/** Extended authentication response that may include PRF output. */
+export type AuthenticationResponseWithPrf = PublicKeyCredentialJSON & {
+  extensions?: {
+    /** PRF output from the authenticator */
+    hmac_get_secret?: PrfOutput;
+    [key: string]: unknown;
+  };
+};
+
+// MARK: - Event Types
+
 export type WebauthnEvent =
   | {
       type: WebauthnEventType.SelectDevice | WebauthnEventType.PresenceRequired;
@@ -69,8 +99,8 @@ export const EVENT_NAME = 'tauri-plugin-webauthn';
 export async function register(
   origin: string,
   options: PublicKeyCredentialCreationOptionsJSON
-): Promise<RegistrationResponseJSON> {
-  return await invoke<RegistrationResponseJSON>('plugin:webauthn|register', {
+): Promise<RegistrationResponseWithPrf> {
+  return await invoke<RegistrationResponseWithPrf>('plugin:webauthn|register', {
     origin,
     options
   });
@@ -86,11 +116,14 @@ export async function register(
 export async function authenticate(
   origin: string,
   options: PublicKeyCredentialRequestOptionsJSON
-): Promise<PublicKeyCredentialJSON> {
-  return await invoke<PublicKeyCredentialJSON>('plugin:webauthn|authenticate', {
-    origin,
-    options
-  });
+): Promise<AuthenticationResponseWithPrf> {
+  return await invoke<AuthenticationResponseWithPrf>(
+    'plugin:webauthn|authenticate',
+    {
+      origin,
+      options
+    }
+  );
 }
 
 /**

@@ -1,5 +1,6 @@
 import Foundation
 import AuthenticationServices
+import CryptoKit
 import UIKit
 
 @available(iOS 15.0, *)
@@ -10,7 +11,8 @@ final class PasskeyHandler: NSObject {
     private var activeController: ASAuthorizationController?
 
     func register(
-        domain: String, challenge: Data, username: String, userID: Data
+        domain: String, challenge: Data, username: String, userID: Data,
+        prfEnabled: Bool
     ) async throws -> ASAuthorization {
         let platformProvider = ASAuthorizationPlatformPublicKeyCredentialProvider(relyingPartyIdentifier: domain)
         let platformRequest = platformProvider.createCredentialRegistrationRequest(
@@ -18,6 +20,12 @@ final class PasskeyHandler: NSObject {
             name: username,
             userID: userID
         )
+
+        if prfEnabled {
+            if #available(iOS 18.0, *) {
+                platformRequest.prf = .checkForSupport
+            }
+        }
 
         let securityKeyProvider = ASAuthorizationSecurityKeyPublicKeyCredentialProvider(relyingPartyIdentifier: domain)
         let securityKeyRequest = securityKeyProvider.createCredentialRegistrationRequest(
@@ -42,7 +50,8 @@ final class PasskeyHandler: NSObject {
     }
 
     func authenticate(
-        domain: String, challenge: Data, allowCredentials: [Data]
+        domain: String, challenge: Data, allowCredentials: [Data],
+        prfSalt1: Data?, prfSalt2: Data?
     ) async throws -> ASAuthorization {
         let platformProvider = ASAuthorizationPlatformPublicKeyCredentialProvider(relyingPartyIdentifier: domain)
         let platformRequest = platformProvider.createCredentialAssertionRequest(challenge: challenge)
@@ -59,6 +68,19 @@ final class PasskeyHandler: NSObject {
                     credentialID: $0,
                     transports: ASAuthorizationSecurityKeyPublicKeyCredentialDescriptor.Transport.allSupported
                 )
+            }
+        }
+
+        // PRF is only supported on platform authenticators (passkeys), not security keys
+        if let salt1 = prfSalt1 {
+            if #available(iOS 18.0, *) {
+                let inputValues: ASAuthorizationPublicKeyCredentialPRFAssertionInput.InputValues
+                if let salt2 = prfSalt2 {
+                    inputValues = .saltInput1(salt1, saltInput2: salt2)
+                } else {
+                    inputValues = .saltInput1(salt1)
+                }
+                platformRequest.prf = .inputValues(inputValues)
             }
         }
 
@@ -134,7 +156,7 @@ func registrationJSON(from auth: ASAuthorization) throws -> [String: Any] {
     guard let reg = auth.credential as? ASAuthorizationPublicKeyCredentialRegistration else {
         throw PasskeyHandlerError.unexpectedCredentialType
     }
-    return [
+    var json: [String: Any] = [
         "id": reg.credentialID.base64URLEncodedString(),
         "rawId": reg.credentialID.base64URLEncodedString(),
         "type": "public-key",
@@ -143,6 +165,16 @@ func registrationJSON(from auth: ASAuthorization) throws -> [String: Any] {
             "clientDataJSON": reg.rawClientDataJSON.base64URLEncodedString()
         ]
     ]
+
+    // Extract PRF registration result (iOS 18+)
+    if #available(iOS 18.0, *) {
+        if let platformReg = reg as? ASAuthorizationPlatformPublicKeyCredentialRegistration,
+           let prfResult = platformReg.prf {
+            json["prf"] = ["enabled": prfResult.isSupported]
+        }
+    }
+
+    return json
 }
 
 @available(iOS 15.0, *)
@@ -150,7 +182,7 @@ func assertionJSON(from auth: ASAuthorization) throws -> [String: Any] {
     guard let assertion = auth.credential as? ASAuthorizationPublicKeyCredentialAssertion else {
         throw PasskeyHandlerError.unexpectedCredentialType
     }
-    return [
+    var json: [String: Any] = [
         "id": assertion.credentialID.base64URLEncodedString(),
         "rawId": assertion.credentialID.base64URLEncodedString(),
         "type": "public-key",
@@ -161,6 +193,24 @@ func assertionJSON(from auth: ASAuthorization) throws -> [String: Any] {
             "userHandle": assertion.userID.base64URLEncodedString()
         ]
     ]
+
+    // Extract PRF assertion result (iOS 18+)
+    if #available(iOS 18.0, *) {
+        if let platformAssertion = assertion as? ASAuthorizationPlatformPublicKeyCredentialAssertion,
+           let prfResult = platformAssertion.prf {
+            let firstData = prfResult.first.withUnsafeBytes { Data($0) }
+            var prfDict: [String: Any] = [
+                "first": firstData.base64URLEncodedString()
+            ]
+            if let second = prfResult.second {
+                let secondData = second.withUnsafeBytes { Data($0) }
+                prfDict["second"] = secondData.base64URLEncodedString()
+            }
+            json["prf"] = prfDict
+        }
+    }
+
+    return json
 }
 
 // MARK: - Data Helpers

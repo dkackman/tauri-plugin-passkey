@@ -34,6 +34,18 @@ pub(crate) async fn authenticate<R: Runtime>(
   options: PublicKeyCredentialRequestOptions,
   timeout: Option<u32>,
 ) -> Result<PublicKeyCredential> {
+  if let Some(ext) = &options.extensions {
+    if let Some(prf) = &ext.hmac_get_secret {
+      if let Some(salt2) = &prf.output2 {
+        if prf.output1 == *salt2 {
+          return Err(crate::Error::Authenticator(
+            "PRF salt1 and salt2 must not be identical".into(),
+          ));
+        }
+      }
+    }
+  }
+
   block_in_place(|| {
     app
       .webauthn()
