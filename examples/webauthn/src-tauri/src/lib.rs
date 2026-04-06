@@ -268,11 +268,19 @@ async fn auth_finish(
     .take()
     .log_none("No pending authentication. Did you call authenticate first?")?;
 
-  webauthn
+  let auth_result = webauthn
     .lock()
     .await
     .finish_discoverable_authentication(&response, passkey_auth, &[(&passkey).into()])
     .log_err("Failed to verify authentication")?;
+
+  if auth_result.needs_update() {
+    if let Some(user_passkeys) = passkeys.lock().await.get_mut(&user) {
+      if let Some(pk) = user_passkeys.iter_mut().find(|p| p.cred_id() == cred_id) {
+        pk.update_credential(&auth_result);
+      }
+    }
+  }
 
   // Extract PRF results from clientExtensionResults. Note: this field is NOT
   // covered by the authenticator's signature per the WebAuthn spec. On macOS/iOS
@@ -293,6 +301,7 @@ async fn auth_finish(
 async fn auth_finish_non_discoverable(
   webauthn: State<'_, Mutex<Webauthn>>,
   state: State<'_, Mutex<Option<PasskeyAuthentication>>>,
+  passkeys: State<'_, Mutex<HashMap<Uuid, Vec<Passkey>>>>,
   response: PublicKeyCredential,
 ) -> Result<Option<PrfResults>, String> {
   let passkey_auth = state
@@ -300,10 +309,24 @@ async fn auth_finish_non_discoverable(
     .await
     .take()
     .log_none("No pending authentication. Did you call authenticate first?")?;
-  let webauthn = webauthn.lock().await;
-  webauthn
-    .finish_passkey_authentication(&response, &passkey_auth)
-    .log_err("Failed to verify authentication")?;
+
+  let auth_result = {
+    let webauthn = webauthn.lock().await;
+    webauthn
+      .finish_passkey_authentication(&response, &passkey_auth)
+      .log_err("Failed to verify authentication")?
+  };
+
+  if auth_result.needs_update() {
+    let cred_id = auth_result.cred_id();
+    let mut passkeys_lock = passkeys.lock().await;
+    for user_passkeys in passkeys_lock.values_mut() {
+      if let Some(pk) = user_passkeys.iter_mut().find(|p| p.cred_id() == cred_id) {
+        pk.update_credential(&auth_result);
+        break;
+      }
+    }
+  }
 
   // Extract PRF results from clientExtensionResults. Note: this field is NOT
   // covered by the authenticator's signature per the WebAuthn spec. On macOS/iOS
