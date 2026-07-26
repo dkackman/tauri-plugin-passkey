@@ -1,4 +1,5 @@
 use authenticator::{ctap2::server::PublicKeyCredentialUserEntity, StatusPinUv, StatusUpdate};
+use base64::{prelude::BASE64_URL_SAFE_NO_PAD, Engine};
 use serde::{Deserialize, Serialize};
 
 /// Nearly identical to the `StatusUpdate` enum, but serializable
@@ -7,12 +8,32 @@ use serde::{Deserialize, Serialize};
 pub enum WebauthnEvent {
   SelectDevice,
   PresenceRequired,
-  PinEvent {
-    event: PinEvent,
-  },
-  SelectKey {
-    keys: Vec<PublicKeyCredentialUserEntity>,
-  },
+  PinEvent { event: PinEvent },
+  SelectKey { keys: Vec<SelectKeyUser> },
+}
+
+/// User entry offered to the frontend for key selection. `id` is the
+/// credential user handle, base64url-encoded (unpadded) — the crate's own
+/// type would serialize it as a JSON number array, which does not match the
+/// TS `AuthKey` type.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SelectKeyUser {
+  pub id: String,
+  #[serde(skip_serializing_if = "Option::is_none")]
+  pub name: Option<String>,
+  #[serde(skip_serializing_if = "Option::is_none")]
+  pub display_name: Option<String>,
+}
+
+impl From<PublicKeyCredentialUserEntity> for SelectKeyUser {
+  fn from(user: PublicKeyCredentialUserEntity) -> Self {
+    SelectKeyUser {
+      id: BASE64_URL_SAFE_NO_PAD.encode(&user.id),
+      name: user.name,
+      display_name: user.display_name,
+    }
+  }
 }
 
 /// Nearly identical to the `StatusPinUv` enum, but serializable
@@ -40,7 +61,9 @@ impl WebauthnEvent {
       StatusUpdate::PinUvError(event) => Some(WebauthnEvent::PinEvent {
         event: event.into(),
       }),
-      StatusUpdate::SelectResultNotice(.., users) => Some(WebauthnEvent::SelectKey { keys: users }),
+      StatusUpdate::SelectResultNotice(.., users) => Some(WebauthnEvent::SelectKey {
+        keys: users.into_iter().map(Into::into).collect(),
+      }),
       StatusUpdate::InteractiveManagement(..) => None,
     }
   }

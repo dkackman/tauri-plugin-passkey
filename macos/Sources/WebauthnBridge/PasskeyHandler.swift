@@ -9,8 +9,8 @@ public final class PasskeyHandler: NSObject {
     private var activeController: ASAuthorizationController?
 
     public func register(
-        domain: String, challenge: Data, username: String, userID: Data,
-        prfEnabled: Bool
+        domain: String, challenge: Data, username: String, displayName: String,
+        userID: Data, excludeCredentials: [Data], prfEnabled: Bool
     ) async throws -> ASAuthorization {
         let platformProvider = ASAuthorizationPlatformPublicKeyCredentialProvider(relyingPartyIdentifier: domain)
         let platformRequest = platformProvider.createCredentialRegistrationRequest(
@@ -25,16 +25,32 @@ public final class PasskeyHandler: NSObject {
             }
         }
 
+        if !excludeCredentials.isEmpty {
+            if #available(macOS 14.0, *) {
+                platformRequest.excludedCredentials = excludeCredentials.map {
+                    ASAuthorizationPlatformPublicKeyCredentialDescriptor(credentialID: $0)
+                }
+            }
+        }
+
         let securityKeyProvider = ASAuthorizationSecurityKeyPublicKeyCredentialProvider(relyingPartyIdentifier: domain)
         let securityKeyRequest = securityKeyProvider.createCredentialRegistrationRequest(
             challenge: challenge,
-            displayName: username,
+            displayName: displayName,
             name: username,
             userID: userID
         )
         securityKeyRequest.credentialParameters = [
             ASAuthorizationPublicKeyCredentialParameters(algorithm: .ES256)
         ]
+        if !excludeCredentials.isEmpty {
+            securityKeyRequest.excludedCredentials = excludeCredentials.map {
+                ASAuthorizationSecurityKeyPublicKeyCredentialDescriptor(
+                    credentialID: $0,
+                    transports: ASAuthorizationSecurityKeyPublicKeyCredentialDescriptor.Transport.allSupported
+                )
+            }
+        }
 
         let controller = ASAuthorizationController(authorizationRequests: [platformRequest, securityKeyRequest])
         controller.delegate = self
@@ -94,6 +110,10 @@ public final class PasskeyHandler: NSObject {
     }
 
     public func cancel() {
+        // Dismiss the system sheet. This asynchronously triggers
+        // didCompleteWithError(ASAuthorizationError.canceled), which is a
+        // no-op because the continuations are nil-ed below first.
+        activeController?.cancel()
         activeController = nil
         registrationContinuation?.resume(throwing: CancellationError())
         registrationContinuation = nil

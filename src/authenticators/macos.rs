@@ -9,9 +9,9 @@ use base64urlsafedata::Base64UrlSafeData;
 use serde::de::DeserializeOwned;
 use tauri::{plugin::PluginApi, AppHandle, Runtime, Url};
 use webauthn_rs_proto::{
-  AuthenticatorAssertionResponseRaw, AuthenticatorAttestationResponseRaw,
-  HmacGetSecretOutput, PublicKeyCredential, PublicKeyCredentialCreationOptions,
-  PublicKeyCredentialRequestOptions, RegisterPublicKeyCredential,
+  AuthenticatorAssertionResponseRaw, AuthenticatorAttestationResponseRaw, HmacGetSecretOutput,
+  PublicKeyCredential, PublicKeyCredentialCreationOptions, PublicKeyCredentialRequestOptions,
+  RegisterPublicKeyCredential,
 };
 
 use super::Authenticator;
@@ -25,8 +25,10 @@ extern "C" {
     challenge_ptr: *const c_uchar,
     challenge_len: usize,
     username: *const c_char,
+    display_name: *const c_char,
     user_id_ptr: *const c_uchar,
     user_id_len: usize,
+    exclude_credentials_json: *const c_char,
     prf_enabled: u8,
     context: u64,
     callback: WebauthnCallback,
@@ -72,6 +74,27 @@ impl<R: Runtime> Authenticator<R> for Webauthn<R> {
     let domain = to_cstring(options.rp.id.as_str())?;
     let challenge = options.challenge.as_slice();
     let username = to_cstring(options.user.name.as_str())?;
+    let display_name = to_cstring(options.user.display_name.as_str())?;
+
+    let exclude_creds_json = {
+      let ids: Vec<String> = options
+        .exclude_credentials
+        .iter()
+        .flatten()
+        .map(|c| base64_url_encode(c.id.as_slice()))
+        .collect();
+      if ids.is_empty() {
+        None
+      } else {
+        Some(to_cstring(&serde_json::to_string(&ids)?)?)
+      }
+    };
+    // SAFETY: same invariant as allow_creds_json in `authenticate` — the
+    // Swift export copies this into a Swift String before returning.
+    let exclude_ptr = exclude_creds_json
+      .as_deref()
+      .map(|c| c.as_ptr())
+      .unwrap_or(std::ptr::null());
     let user_id = options.user.id.as_slice();
 
     // Check if PRF/hmac-secret was requested
@@ -95,8 +118,10 @@ impl<R: Runtime> Authenticator<R> for Webauthn<R> {
         challenge.as_ptr(),
         challenge.len(),
         username.as_ptr(),
+        display_name.as_ptr(),
         user_id.as_ptr(),
         user_id.len(),
+        exclude_ptr,
         prf_enabled,
         context,
         ffi_callback,
@@ -206,7 +231,12 @@ fn await_swift_result(
 ) -> crate::Result<String> {
   receiver
     .recv_timeout(Duration::from_millis(timeout as u64))
-    .map_err(|e| crate::Error::Authenticator(format!("Timeout waiting for authenticator: {e}")))?
+    .map_err(|e| {
+      // The user never answered the sheet — tear it down so it does not
+      // linger after we have already reported failure to the webview.
+      unsafe { webauthn_cancel() };
+      crate::Error::Authenticator(format!("Timeout waiting for authenticator: {e}"))
+    })?
     .map_err(|e| {
       #[cfg(feature = "log")]
       log::error!("Failed to complete passkey operation: {e}");

@@ -28,3 +28,6 @@ devenv.local.nix
 macos/.build/
 ios/.build/
 examples/webauthn/embedded.provisionprofile
+
+*.provisionprofile
+*.mobileprovision

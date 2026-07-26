@@ -61,8 +61,8 @@ fn build_webauthn(rp_id: &str, rp_origin: &str) -> Result<Webauthn, String> {
   builder.build().log_err("Failed to build Webauthn")
 }
 
-use tauri_plugin_log::{RotationStrategy, Target, TargetKind, TimezoneStrategy};
 use base64::{engine::general_purpose::URL_SAFE_NO_PAD, Engine};
+use tauri_plugin_log::{RotationStrategy, Target, TargetKind, TimezoneStrategy};
 use webauthn_rs::{
   prelude::{
     Base64UrlSafeData, DiscoverableAuthentication, Passkey, PasskeyAuthentication,
@@ -84,7 +84,11 @@ async fn reg_start(
   name: &str,
   enable_prf: bool,
 ) -> Result<PublicKeyCredentialCreationOptions, String> {
-  let uuid = *users.lock().await.entry(name.to_string()).or_insert(Uuid::new_v4());
+  let uuid = *users
+    .lock()
+    .await
+    .entry(name.to_string())
+    .or_insert(Uuid::new_v4());
 
   let existing_creds = passkeys
     .lock()
@@ -160,7 +164,10 @@ async fn auth_start(
     let decode_salt = |s: &str| -> Result<Base64UrlSafeData, String> {
       let bytes = URL_SAFE_NO_PAD.decode(s).log_err("Invalid salt encoding")?;
       if bytes.len() != 32 {
-        return Err(format!("PRF salt must be exactly 32 bytes, got {}", bytes.len()));
+        return Err(format!(
+          "PRF salt must be exactly 32 bytes, got {}",
+          bytes.len()
+        ));
       }
       Ok(Base64UrlSafeData::from(bytes))
     };
@@ -218,7 +225,10 @@ async fn auth_start_non_discoverable(
     let decode_salt = |s: &str| -> Result<Base64UrlSafeData, String> {
       let bytes = URL_SAFE_NO_PAD.decode(s).log_err("Invalid salt encoding")?;
       if bytes.len() != 32 {
-        return Err(format!("PRF salt must be exactly 32 bytes, got {}", bytes.len()));
+        return Err(format!(
+          "PRF salt must be exactly 32 bytes, got {}",
+          bytes.len()
+        ));
       }
       Ok(Base64UrlSafeData::from(bytes))
     };
@@ -279,12 +289,17 @@ async fn auth_finish(
   // the native bridge constructs this from the platform-verified PRF output,
   // so it is trustworthy in practice. A tampered Tauri frontend could inject
   // arbitrary values here.
-  let prf_results = response.extensions.hmac_get_secret.as_ref().map(|hmac| {
-    PrfResults {
+  let prf_results = response
+    .extensions
+    .hmac_get_secret
+    .as_ref()
+    .map(|hmac| PrfResults {
       first: URL_SAFE_NO_PAD.encode(hmac.output1.as_ref()),
-      second: hmac.output2.as_ref().map(|s| URL_SAFE_NO_PAD.encode(s.as_ref())),
-    }
-  });
+      second: hmac
+        .output2
+        .as_ref()
+        .map(|s| URL_SAFE_NO_PAD.encode(s.as_ref())),
+    });
 
   Ok(prf_results)
 }
@@ -310,12 +325,17 @@ async fn auth_finish_non_discoverable(
   // the native bridge constructs this from the platform-verified PRF output,
   // so it is trustworthy in practice. A tampered Tauri frontend could inject
   // arbitrary values here.
-  let prf_results = response.extensions.hmac_get_secret.as_ref().map(|hmac| {
-    PrfResults {
+  let prf_results = response
+    .extensions
+    .hmac_get_secret
+    .as_ref()
+    .map(|hmac| PrfResults {
       first: URL_SAFE_NO_PAD.encode(hmac.output1.as_ref()),
-      second: hmac.output2.as_ref().map(|s| URL_SAFE_NO_PAD.encode(s.as_ref())),
-    }
-  });
+      second: hmac
+        .output2
+        .as_ref()
+        .map(|s| URL_SAFE_NO_PAD.encode(s.as_ref())),
+    });
 
   Ok(prf_results)
 }

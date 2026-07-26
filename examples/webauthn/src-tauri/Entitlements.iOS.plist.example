@@ -4,7 +4,7 @@
 <dict>
     <key>com.apple.developer.associated-domains</key>
     <array>
-        <string>webcredentials:webauthn.dkackman.com?mode=developer</string>
+        <string>webcredentials:DOMAIN_PLACEHOLDER?mode=developer</string>
     </array>
 </dict>
 </plist>

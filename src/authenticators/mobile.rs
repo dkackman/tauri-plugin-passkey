@@ -80,7 +80,9 @@ fn json_bytes(v: &serde_json::Value, key: &str) -> crate::Result<Vec<u8>> {
   )))?)
 }
 
-fn parse_registration_response(v: &serde_json::Value) -> crate::Result<RegisterPublicKeyCredential> {
+fn parse_registration_response(
+  v: &serde_json::Value,
+) -> crate::Result<RegisterPublicKeyCredential> {
   let id = json_str(v, "id")?;
   let raw_id = json_bytes(v, "rawId")?;
 

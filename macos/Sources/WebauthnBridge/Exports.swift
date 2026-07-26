@@ -24,8 +24,10 @@ public func webauthnRegister(
     challengePtr: UnsafePointer<UInt8>,
     challengeLen: UInt,
     username: UnsafePointer<CChar>,
+    displayName: UnsafePointer<CChar>,
     userIdPtr: UnsafePointer<UInt8>,
     userIdLen: UInt,
+    excludeCredentialsJson: UnsafePointer<CChar>?,
     prfEnabled: UInt8,
     context: UInt64,
     callback: WebauthnCallback
@@ -33,8 +35,18 @@ public func webauthnRegister(
     let domainStr = String(cString: domain)
     let challengeData = Data(bytes: challengePtr, count: Int(challengeLen))
     let usernameStr = String(cString: username)
+    let displayNameStr = String(cString: displayName)
     let userIdData = Data(bytes: userIdPtr, count: Int(userIdLen))
     let wantPrf = prfEnabled != 0
+
+    var excludedCredentials: [Data] = []
+    if let jsonPtr = excludeCredentialsJson {
+        let jsonStr = String(cString: jsonPtr)
+        if let jsonData = jsonStr.data(using: .utf8),
+           let arr = try? JSONSerialization.jsonObject(with: jsonData) as? [String] {
+            excludedCredentials = arr.compactMap { base64URLDecode($0) }
+        }
+    }
 
     Task { @MainActor in
         let handler = PasskeyHandler()
@@ -45,7 +57,9 @@ public func webauthnRegister(
                 domain: domainStr,
                 challenge: challengeData,
                 username: usernameStr,
+                displayName: displayNameStr,
                 userID: userIdData,
+                excludeCredentials: excludedCredentials,
                 prfEnabled: wantPrf
             )
 
@@ -123,10 +137,12 @@ public func webauthnCancel() {
 
 private enum BridgeError: LocalizedError {
     case unexpectedCredentialType
+    case missingAttestationObject
 
     var errorDescription: String? {
         switch self {
         case .unexpectedCredentialType: return "Unexpected credential type in authorization response"
+        case .missingAttestationObject: return "Registration returned no attestation object"
         }
     }
 }
@@ -135,12 +151,15 @@ private func registrationJSON(from auth: ASAuthorization) throws -> [String: Any
     guard let reg = auth.credential as? ASAuthorizationPublicKeyCredentialRegistration else {
         throw BridgeError.unexpectedCredentialType
     }
+    guard let attestationObject = reg.rawAttestationObject else {
+        throw BridgeError.missingAttestationObject
+    }
     var json: [String: Any] = [
         "id": reg.credentialID.base64URLEncodedString(),
         "rawId": reg.credentialID.base64URLEncodedString(),
         "type": "public-key",
         "response": [
-            "attestationObject": (reg.rawAttestationObject ?? Data()).base64URLEncodedString(),
+            "attestationObject": attestationObject.base64URLEncodedString(),
             "clientDataJSON": reg.rawClientDataJSON.base64URLEncodedString()
         ]
     ]
@@ -160,16 +179,19 @@ private func assertionJSON(from auth: ASAuthorization) throws -> [String: Any] {
     guard let assertion = auth.credential as? ASAuthorizationPublicKeyCredentialAssertion else {
         throw BridgeError.unexpectedCredentialType
     }
+    var response: [String: Any] = [
+        "authenticatorData": assertion.rawAuthenticatorData.base64URLEncodedString(),
+        "clientDataJSON": assertion.rawClientDataJSON.base64URLEncodedString(),
+        "signature": assertion.signature.base64URLEncodedString()
+    ]
+    if !assertion.userID.isEmpty {
+        response["userHandle"] = assertion.userID.base64URLEncodedString()
+    }
     var json: [String: Any] = [
         "id": assertion.credentialID.base64URLEncodedString(),
         "rawId": assertion.credentialID.base64URLEncodedString(),
         "type": "public-key",
-        "response": [
-            "authenticatorData": assertion.rawAuthenticatorData.base64URLEncodedString(),
-            "clientDataJSON": assertion.rawClientDataJSON.base64URLEncodedString(),
-            "signature": assertion.signature.base64URLEncodedString(),
-            "userHandle": assertion.userID.base64URLEncodedString()
-        ]
+        "response": response
     ]
 
     // Extract PRF assertion result (macOS 15+)

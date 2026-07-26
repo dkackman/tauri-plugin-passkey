@@ -53,40 +53,48 @@ export default {
     const url = new URL(request.url);
 
     // Apple Associated Domains
-    if (url.pathname === '/.well-known/apple-app-site-association' ||
-        url.pathname === '/.well-known/apple-app-site-data') {
-      return new Response(JSON.stringify({
-        webcredentials: {
-          apps: ["TEAM_ID.BUNDLE_ID"]
+    if (
+      url.pathname === '/.well-known/apple-app-site-association' ||
+      url.pathname === '/.well-known/apple-app-site-data'
+    ) {
+      return new Response(
+        JSON.stringify({
+          webcredentials: {
+            apps: ['TEAM_ID.BUNDLE_ID']
+          }
+        }),
+        {
+          headers: {
+            'Content-Type': 'application/json',
+            'Access-Control-Allow-Origin': '*'
+          }
         }
-      }), {
-        headers: {
-          'Content-Type': 'application/json',
-          'Access-Control-Allow-Origin': '*'
-        }
-      });
+      );
     }
 
     // Android Digital Asset Links
     else if (url.pathname === '/.well-known/assetlinks.json') {
-      return new Response(JSON.stringify([{
-        relation: [
-          "delegate_permission/common.handle_all_urls",
-          "delegate_permission/common.get_login_creds"
-        ],
-        target: {
-          namespace: "android_app",
-          package_name: "BUNDLE_ID",
-          sha256_cert_fingerprints: [
-            "YOUR_SHA256_FINGERPRINT"
-          ]
+      return new Response(
+        JSON.stringify([
+          {
+            relation: [
+              'delegate_permission/common.handle_all_urls',
+              'delegate_permission/common.get_login_creds'
+            ],
+            target: {
+              namespace: 'android_app',
+              package_name: 'BUNDLE_ID',
+              sha256_cert_fingerprints: ['YOUR_SHA256_FINGERPRINT']
+            }
+          }
+        ]),
+        {
+          headers: {
+            'Content-Type': 'application/json',
+            'Access-Control-Allow-Origin': '*'
+          }
         }
-      }]), {
-        headers: {
-          'Content-Type': 'application/json',
-          'Access-Control-Allow-Origin': '*'
-        }
-      });
+      );
     }
 
     return new Response('WebAuthn RP', { status: 200 });
@@ -96,11 +104,11 @@ export default {
 
 Replace the placeholders:
 
-| Placeholder | Value | Where to find it |
-| --- | --- | --- |
-| `TEAM_ID` | Your Apple Developer Team ID | [Apple Developer > Membership](https://developer.apple.com/help/account/manage-your-team/locate-your-team-id/) |
-| `BUNDLE_ID` | Your app's bundle identifier | `identifier` in `tauri.conf.json` |
-| `YOUR_SHA256_FINGERPRINT` | Android signing certificate fingerprint | `./gradlew signingReport` in the Android project |
+| Placeholder               | Value                                   | Where to find it                                                                                               |
+| ------------------------- | --------------------------------------- | -------------------------------------------------------------------------------------------------------------- |
+| `TEAM_ID`                 | Your Apple Developer Team ID            | [Apple Developer > Membership](https://developer.apple.com/help/account/manage-your-team/locate-your-team-id/) |
+| `BUNDLE_ID`               | Your app's bundle identifier            | `identifier` in `tauri.conf.json`                                                                              |
+| `YOUR_SHA256_FINGERPRINT` | Android signing certificate fingerprint | `./gradlew signingReport` in the Android project                                                               |
 
 The `apps` array entry must be `TEAM_ID.BUNDLE_ID` with a dot separator (not a slash).
 

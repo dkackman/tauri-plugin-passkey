@@ -10,8 +10,8 @@ final class PasskeyHandler: NSObject {
     private var activeController: ASAuthorizationController?
 
     func register(
-        domain: String, challenge: Data, username: String, userID: Data,
-        prfEnabled: Bool
+        domain: String, challenge: Data, username: String, displayName: String,
+        userID: Data, excludeCredentials: [Data], prfEnabled: Bool
     ) async throws -> ASAuthorization {
         let platformProvider = ASAuthorizationPlatformPublicKeyCredentialProvider(relyingPartyIdentifier: domain)
         let platformRequest = platformProvider.createCredentialRegistrationRequest(
@@ -26,16 +26,32 @@ final class PasskeyHandler: NSObject {
             }
         }
 
+        if !excludeCredentials.isEmpty {
+            if #available(iOS 17.4, *) {
+                platformRequest.excludedCredentials = excludeCredentials.map {
+                    ASAuthorizationPlatformPublicKeyCredentialDescriptor(credentialID: $0)
+                }
+            }
+        }
+
         let securityKeyProvider = ASAuthorizationSecurityKeyPublicKeyCredentialProvider(relyingPartyIdentifier: domain)
         let securityKeyRequest = securityKeyProvider.createCredentialRegistrationRequest(
             challenge: challenge,
-            displayName: username,
+            displayName: displayName,
             name: username,
             userID: userID
         )
         securityKeyRequest.credentialParameters = [
             ASAuthorizationPublicKeyCredentialParameters(algorithm: .ES256)
         ]
+        if !excludeCredentials.isEmpty {
+            securityKeyRequest.excludedCredentials = excludeCredentials.map {
+                ASAuthorizationSecurityKeyPublicKeyCredentialDescriptor(
+                    credentialID: $0,
+                    transports: ASAuthorizationSecurityKeyPublicKeyCredentialDescriptor.Transport.allSupported
+                )
+            }
+        }
 
         let controller = ASAuthorizationController(authorizationRequests: [platformRequest, securityKeyRequest])
         controller.delegate = self
@@ -95,6 +111,10 @@ final class PasskeyHandler: NSObject {
     }
 
     func cancel() {
+        // Dismiss the system sheet. This asynchronously triggers
+        // didCompleteWithError(ASAuthorizationError.canceled), which is a
+        // no-op because the continuations are nil-ed below first.
+        activeController?.cancel()
         activeController = nil
         registrationContinuation?.resume(throwing: CancellationError())
         registrationContinuation = nil
@@ -144,9 +164,13 @@ extension PasskeyHandler: ASAuthorizationControllerDelegate, ASAuthorizationCont
 
 enum PasskeyHandlerError: LocalizedError {
     case unexpectedCredentialType
+    case missingAttestationObject
 
     var errorDescription: String? {
-        "Unexpected credential type in authorization response"
+        switch self {
+        case .unexpectedCredentialType: return "Unexpected credential type in authorization response"
+        case .missingAttestationObject: return "Registration returned no attestation object"
+        }
     }
 }
 
@@ -155,12 +179,15 @@ func registrationJSON(from auth: ASAuthorization) throws -> [String: Any] {
     guard let reg = auth.credential as? ASAuthorizationPublicKeyCredentialRegistration else {
         throw PasskeyHandlerError.unexpectedCredentialType
     }
+    guard let attestationObject = reg.rawAttestationObject else {
+        throw PasskeyHandlerError.missingAttestationObject
+    }
     var json: [String: Any] = [
         "id": reg.credentialID.base64URLEncodedString(),
         "rawId": reg.credentialID.base64URLEncodedString(),
         "type": "public-key",
         "response": [
-            "attestationObject": (reg.rawAttestationObject ?? Data()).base64URLEncodedString(),
+            "attestationObject": attestationObject.base64URLEncodedString(),
             "clientDataJSON": reg.rawClientDataJSON.base64URLEncodedString()
         ]
     ]
@@ -181,16 +208,19 @@ func assertionJSON(from auth: ASAuthorization) throws -> [String: Any] {
     guard let assertion = auth.credential as? ASAuthorizationPublicKeyCredentialAssertion else {
         throw PasskeyHandlerError.unexpectedCredentialType
     }
+    var response: [String: Any] = [
+        "authenticatorData": assertion.rawAuthenticatorData.base64URLEncodedString(),
+        "clientDataJSON": assertion.rawClientDataJSON.base64URLEncodedString(),
+        "signature": assertion.signature.base64URLEncodedString()
+    ]
+    if !assertion.userID.isEmpty {
+        response["userHandle"] = assertion.userID.base64URLEncodedString()
+    }
     var json: [String: Any] = [
         "id": assertion.credentialID.base64URLEncodedString(),
         "rawId": assertion.credentialID.base64URLEncodedString(),
         "type": "public-key",
-        "response": [
-            "authenticatorData": assertion.rawAuthenticatorData.base64URLEncodedString(),
-            "clientDataJSON": assertion.rawClientDataJSON.base64URLEncodedString(),
-            "signature": assertion.signature.base64URLEncodedString(),
-            "userHandle": assertion.userID.base64URLEncodedString()
-        ]
+        "response": response
     ]
 
     // Extract PRF assertion result (iOS 18+)

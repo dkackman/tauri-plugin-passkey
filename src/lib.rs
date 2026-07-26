@@ -7,6 +7,7 @@ use tauri::{
 mod authenticators;
 mod commands;
 mod error;
+mod validation;
 
 pub use error::{Error, Result};
 
