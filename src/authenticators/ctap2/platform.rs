@@ -1,5 +1,8 @@
 use std::{
-  sync::mpsc::{channel, Sender},
+  sync::{
+    mpsc::{channel, Sender},
+    Mutex,
+  },
   thread,
 };
 
@@ -21,10 +24,10 @@ use openssl::sha::Sha256;
 use tauri::{async_runtime::block_on, AppHandle, Emitter, Runtime, Url};
 use tokio::sync::mpsc;
 use webauthn_rs_proto::{
-  AuthenticatorTransport, PublicKeyCredential,
-  PublicKeyCredentialCreationOptions, PublicKeyCredentialRequestOptions,
-  RegisterPublicKeyCredential, RegistrationExtensionsClientOutputs,
-  RequestAuthenticationExtensions, RequestRegistrationExtensions,
+  AuthenticatorTransport, PublicKeyCredential, PublicKeyCredentialCreationOptions,
+  PublicKeyCredentialRequestOptions, RegisterPublicKeyCredential,
+  RegistrationExtensionsClientOutputs, RequestAuthenticationExtensions,
+  RequestRegistrationExtensions,
 };
 
 use crate::authenticators::ctap2::event::WebauthnEvent;
@@ -37,166 +40,159 @@ pub fn init_manager() -> crate::Result<AuthenticatorService> {
   Ok(manager)
 }
 
-pub trait AuthenticatorExt {
-  fn perform_register(
-    &mut self,
-    status_tx: Sender<StatusUpdate>,
-    url: Url,
-    options: PublicKeyCredentialCreationOptions,
-    timeout: u64,
-  ) -> crate::Result<RegisterPublicKeyCredential>;
+pub fn perform_register(
+  manager: &Mutex<AuthenticatorService>,
+  status_tx: Sender<StatusUpdate>,
+  url: Url,
+  options: PublicKeyCredentialCreationOptions,
+  timeout: u64,
+) -> crate::Result<RegisterPublicKeyCredential> {
+  let client_data =
+    crate::validation::build_client_data("webauthn.create", &options.challenge, &url)?;
 
-  fn perform_authentication(
-    &mut self,
-    status_tx: Sender<StatusUpdate>,
-    url: Url,
-    options: PublicKeyCredentialRequestOptions,
-    timeout: u64,
-  ) -> crate::Result<PublicKeyCredential>;
+  let mut hasher = Sha256::new();
+  hasher.update(&client_data);
+  let client_data_hash = hasher.finish();
+
+  let args = RegisterArgs {
+    pin: None,
+    client_data_hash,
+    origin: url.to_string(),
+    user_verification_req: UserVerificationRequirement::Required,
+    use_ctap1_fallback: false,
+    relying_party: RelyingParty {
+      id: options.rp.id,
+      name: Some(options.rp.name),
+    },
+    user: PublicKeyCredentialUserEntity {
+      id: options.user.id.to_vec(),
+      name: Some(options.user.name),
+      display_name: Some(options.user.display_name),
+    },
+    exclude_list: Vec::new(),
+    resident_key_req: ResidentKeyRequirement::Required,
+    extensions: convert_request_registration_extensions(options.extensions),
+    pub_cred_params: convert_algorithms(options.pub_key_cred_params),
+  };
+
+  let (register_tx, register_rx) = channel();
+  let callback = StateCallback::new(Box::new(move |rv| {
+    let _ = register_tx.send(rv);
+  }));
+
+  // `args` carries the hmac-secret/PRF inputs, which are key-derivation
+  // secrets — log only non-sensitive shape, never the struct itself.
+  #[cfg(feature = "log")]
+  log::debug!(
+    "Registering with rp_id={}, {} pub_cred_params",
+    args.relying_party.id,
+    args.pub_cred_params.len()
+  );
+
+  // Hold the manager lock only for this dispatch: `register` hands the work
+  // to transport threads and returns. The blocking wait below must run
+  // WITHOUT the lock so that `cancel()` can acquire it mid-operation.
+  manager
+    .lock()
+    .unwrap()
+    .register(timeout, args, status_tx, callback)?;
+
+  let result = register_rx.recv().map_err(|_| {
+    crate::Error::Authenticator("Registration ended without a result".to_string())
+  })??;
+
+  #[cfg(feature = "log")]
+  log::debug!("Register succeeded");
+
+  Ok(webauthn_rs_proto::RegisterPublicKeyCredential {
+    extensions: convert_response_registration_extensions(result.extensions),
+    response: webauthn_rs_proto::AuthenticatorAttestationResponseRaw {
+      attestation_object: serde_cbor_2::to_vec(&result.att_obj)?.into(),
+      client_data_json: Base64UrlSafeData::from(client_data),
+      transports: Some(vec![
+        AuthenticatorTransport::Usb,
+        AuthenticatorTransport::Nfc,
+        AuthenticatorTransport::Internal,
+        AuthenticatorTransport::Ble,
+      ]),
+    },
+    id: String::new(),
+    raw_id: Vec::new().into(),
+    type_: "public-key".to_string(),
+  })
 }
 
-impl AuthenticatorExt for AuthenticatorService {
-  fn perform_register(
-    &mut self,
-    status_tx: Sender<StatusUpdate>,
-    url: Url,
-    options: PublicKeyCredentialCreationOptions,
-    timeout: u64,
-  ) -> crate::Result<RegisterPublicKeyCredential> {
-    let client_data =
-      crate::validation::build_client_data("webauthn.create", &options.challenge, &url)?;
+pub fn perform_authentication(
+  manager: &Mutex<AuthenticatorService>,
+  status_tx: Sender<StatusUpdate>,
+  url: Url,
+  options: PublicKeyCredentialRequestOptions,
+  timeout: u64,
+) -> crate::Result<PublicKeyCredential> {
+  let client_data = crate::validation::build_client_data("webauthn.get", &options.challenge, &url)?;
 
-    let mut hasher = Sha256::new();
-    hasher.update(&client_data);
-    let client_data_hash = hasher.finish();
+  let mut hasher = Sha256::new();
+  hasher.update(&client_data);
+  let client_data_hash = hasher.finish();
 
-    let args = RegisterArgs {
-      pin: None,
-      client_data_hash,
-      origin: url.to_string(),
-      user_verification_req: UserVerificationRequirement::Required,
-      use_ctap1_fallback: false,
-      relying_party: RelyingParty {
-        id: options.rp.id,
-        name: Some(options.rp.name),
-      },
-      user: PublicKeyCredentialUserEntity {
-        id: options.user.id.to_vec(),
-        name: Some(options.user.name),
-        display_name: Some(options.user.display_name),
-      },
-      exclude_list: Vec::new(),
-      resident_key_req: ResidentKeyRequirement::Required,
-      extensions: convert_request_registration_extensions(options.extensions),
-      pub_cred_params: convert_algorithms(options.pub_key_cred_params),
-    };
+  let args = SignArgs {
+    pin: None,
+    relying_party_id: options.rp_id.clone(),
+    client_data_hash,
+    origin: url.to_string(),
+    user_presence_req: true,
+    user_verification_req: UserVerificationRequirement::Required,
+    use_ctap1_fallback: false,
+    allow_list: Vec::new(),
+    extensions: convert_request_authentication_extensions(options.extensions)?,
+  };
 
-    let (register_tx, register_rx) = channel();
-    let callback = StateCallback::new(Box::new(move |rv| {
-      let _ = register_tx.send(rv);
-    }));
+  let (sign_tx, sign_rx) = channel();
+  let callback = StateCallback::new(Box::new(move |rv| {
+    let _ = sign_tx.send(rv);
+  }));
 
-    // `args` carries the hmac-secret/PRF inputs, which are key-derivation
-    // secrets — log only non-sensitive shape, never the struct itself.
-    #[cfg(feature = "log")]
-    log::debug!(
-      "Registering with rp_id={}, {} pub_cred_params",
-      args.relying_party.id,
-      args.pub_cred_params.len()
-    );
+  // `args.extensions` carries the PRF salts — see perform_register.
+  #[cfg(feature = "log")]
+  log::debug!("Signing with rp_id={}", args.relying_party_id);
 
-    self.register(timeout, args, status_tx, callback)?;
-    let result = register_rx.recv().map_err(|_| {
-      crate::Error::Authenticator("Registration ended without a result".to_string())
-    })??;
+  // Hold the manager lock only for this dispatch: `sign` hands the work
+  // to transport threads and returns. The blocking wait below must run
+  // WITHOUT the lock so that `cancel()` can acquire it mid-operation.
+  manager
+    .lock()
+    .unwrap()
+    .sign(timeout, args, status_tx, callback)?;
 
-    #[cfg(feature = "log")]
-    log::debug!("Register succeeded");
+  let result = sign_rx.recv().map_err(|_| {
+    crate::Error::Authenticator("Authentication ended without a result".to_string())
+  })??;
 
-    Ok(webauthn_rs_proto::RegisterPublicKeyCredential {
-      extensions: convert_response_registration_extensions(result.extensions),
-      response: webauthn_rs_proto::AuthenticatorAttestationResponseRaw {
-        attestation_object: serde_cbor_2::to_vec(&result.att_obj)?.into(),
-        client_data_json: Base64UrlSafeData::from(client_data),
-        transports: Some(vec![
-          AuthenticatorTransport::Usb,
-          AuthenticatorTransport::Nfc,
-          AuthenticatorTransport::Internal,
-          AuthenticatorTransport::Ble,
-        ]),
-      },
-      id: String::new(),
-      raw_id: Vec::new().into(),
-      type_: "public-key".to_string(),
-    })
-  }
+  // The sign result contains the PRF outputs — do not log it.
+  #[cfg(feature = "log")]
+  log::debug!("Sign succeeded");
 
-  fn perform_authentication(
-    &mut self,
-    status_tx: Sender<StatusUpdate>,
-    url: Url,
-    options: PublicKeyCredentialRequestOptions,
-    timeout: u64,
-  ) -> crate::Result<PublicKeyCredential> {
-    let client_data =
-      crate::validation::build_client_data("webauthn.get", &options.challenge, &url)?;
+  // `credentials` is legitimately absent when a single discoverable
+  // credential matched, so fall back to an empty id rather than panicking.
+  let raw_id = result
+    .assertion
+    .credentials
+    .map(|c| c.id)
+    .unwrap_or_default();
+  let data = serde_cbor_2::to_vec(&result.assertion.auth_data)?;
 
-    let mut hasher = Sha256::new();
-    hasher.update(&client_data);
-    let client_data_hash = hasher.finish();
-
-    let args = SignArgs {
-      pin: None,
-      relying_party_id: options.rp_id.clone(),
-      client_data_hash,
-      origin: url.to_string(),
-      user_presence_req: true,
-      user_verification_req: UserVerificationRequirement::Required,
-      use_ctap1_fallback: false,
-      allow_list: Vec::new(),
-      extensions: convert_request_authentication_extensions(options.extensions)?,
-    };
-
-    let (sign_tx, sign_rx) = channel();
-    let callback = StateCallback::new(Box::new(move |rv| {
-      let _ = sign_tx.send(rv);
-    }));
-
-    // `args.extensions` carries the PRF salts — see perform_register.
-    #[cfg(feature = "log")]
-    log::debug!("Signing with rp_id={}", args.relying_party_id);
-
-    self.sign(timeout, args, status_tx, callback)?;
-    let result = sign_rx.recv().map_err(|_| {
-      crate::Error::Authenticator("Authentication ended without a result".to_string())
-    })??;
-
-    // The sign result contains the PRF outputs — do not log it.
-    #[cfg(feature = "log")]
-    log::debug!("Sign succeeded");
-
-    // `credentials` is legitimately absent when a single discoverable
-    // credential matched, so fall back to an empty id rather than panicking.
-    let raw_id = result
-      .assertion
-      .credentials
-      .map(|c| c.id)
-      .unwrap_or_default();
-    let data = serde_cbor_2::to_vec(&result.assertion.auth_data)?;
-
-    Ok(PublicKeyCredential {
-      id: BASE64_URL_SAFE_NO_PAD.encode(&raw_id),
-      raw_id: raw_id.into(),
-      type_: "public-key".to_string(),
-      response: webauthn_rs_proto::AuthenticatorAssertionResponseRaw {
-        client_data_json: Base64UrlSafeData::from(client_data),
-        authenticator_data: data[2..].into(),
-        signature: result.assertion.signature.into(),
-        user_handle: result.assertion.user.map(|h| h.id.into()),
-      },
-      extensions: convert_response_authentication_extensions(result.extensions),
-    })
-  }
+  Ok(PublicKeyCredential {
+    id: BASE64_URL_SAFE_NO_PAD.encode(&raw_id),
+    raw_id: raw_id.into(),
+    type_: "public-key".to_string(),
+    response: webauthn_rs_proto::AuthenticatorAssertionResponseRaw {
+      client_data_json: Base64UrlSafeData::from(client_data),
+      authenticator_data: data[2..].into(),
+      signature: result.assertion.signature.into(),
+      user_handle: result.assertion.user.map(|h| h.id.into()),
+    },
+    extensions: convert_response_authentication_extensions(result.extensions),
+  })
 }
 
 pub fn status<R: Runtime>(

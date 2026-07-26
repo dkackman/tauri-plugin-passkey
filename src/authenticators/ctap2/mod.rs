@@ -4,7 +4,6 @@ use std::{
 };
 
 use authenticator::{authenticatorservice::AuthenticatorService, Pin, StatusUpdate};
-use platform::AuthenticatorExt;
 use serde::de::DeserializeOwned;
 use tauri::{plugin::PluginApi, AppHandle, Runtime, Url};
 use tokio::sync::mpsc;
@@ -51,14 +50,18 @@ impl<R: Runtime> Authenticator<R> for Webauthn<R> {
     // `options.extensions` can carry PRF inputs — log identifiers only.
     #[cfg(feature = "log")]
     log::info!("Registering for rp_id={}", options.rp.id);
-    let mut manager = self.manager.lock().unwrap();
-    manager
-      .perform_register(self.status_tx.clone(), origin, options, timeout as u64)
-      .map_err(|e| {
-        #[cfg(feature = "log")]
-        log::error!("Failed to register: {e:?}");
-        e
-      })
+    platform::perform_register(
+      &self.manager,
+      self.status_tx.clone(),
+      origin,
+      options,
+      timeout as u64,
+    )
+    .map_err(|e| {
+      #[cfg(feature = "log")]
+      log::error!("Failed to register: {e:?}");
+      e
+    })
   }
 
   /// Authenticate using ctap2.
@@ -71,14 +74,18 @@ impl<R: Runtime> Authenticator<R> for Webauthn<R> {
     // `options.extensions` carries the PRF salts — log identifiers only.
     #[cfg(feature = "log")]
     log::debug!("Authenticating for rp_id={}", options.rp_id);
-    let mut manager = self.manager.lock().unwrap();
-    manager
-      .perform_authentication(self.status_tx.clone(), origin, options, timeout as u64)
-      .map_err(|e| {
-        #[cfg(feature = "log")]
-        log::error!("Failed to authenticate: {e:?}");
-        e
-      })
+    platform::perform_authentication(
+      &self.manager,
+      self.status_tx.clone(),
+      origin,
+      options,
+      timeout as u64,
+    )
+    .map_err(|e| {
+      #[cfg(feature = "log")]
+      log::error!("Failed to authenticate: {e:?}");
+      e
+    })
   }
 
   /// Send a PIN to the authenticator does nothing if no PIN was requested.
