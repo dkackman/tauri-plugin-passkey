@@ -137,10 +137,12 @@ public func webauthnCancel() {
 
 private enum BridgeError: LocalizedError {
     case unexpectedCredentialType
+    case missingAttestationObject
 
     var errorDescription: String? {
         switch self {
         case .unexpectedCredentialType: return "Unexpected credential type in authorization response"
+        case .missingAttestationObject: return "Registration returned no attestation object"
         }
     }
 }
@@ -149,12 +151,15 @@ private func registrationJSON(from auth: ASAuthorization) throws -> [String: Any
     guard let reg = auth.credential as? ASAuthorizationPublicKeyCredentialRegistration else {
         throw BridgeError.unexpectedCredentialType
     }
+    guard let attestationObject = reg.rawAttestationObject else {
+        throw BridgeError.missingAttestationObject
+    }
     var json: [String: Any] = [
         "id": reg.credentialID.base64URLEncodedString(),
         "rawId": reg.credentialID.base64URLEncodedString(),
         "type": "public-key",
         "response": [
-            "attestationObject": (reg.rawAttestationObject ?? Data()).base64URLEncodedString(),
+            "attestationObject": attestationObject.base64URLEncodedString(),
             "clientDataJSON": reg.rawClientDataJSON.base64URLEncodedString()
         ]
     ]
@@ -174,16 +179,19 @@ private func assertionJSON(from auth: ASAuthorization) throws -> [String: Any] {
     guard let assertion = auth.credential as? ASAuthorizationPublicKeyCredentialAssertion else {
         throw BridgeError.unexpectedCredentialType
     }
+    var response: [String: Any] = [
+        "authenticatorData": assertion.rawAuthenticatorData.base64URLEncodedString(),
+        "clientDataJSON": assertion.rawClientDataJSON.base64URLEncodedString(),
+        "signature": assertion.signature.base64URLEncodedString()
+    ]
+    if !assertion.userID.isEmpty {
+        response["userHandle"] = assertion.userID.base64URLEncodedString()
+    }
     var json: [String: Any] = [
         "id": assertion.credentialID.base64URLEncodedString(),
         "rawId": assertion.credentialID.base64URLEncodedString(),
         "type": "public-key",
-        "response": [
-            "authenticatorData": assertion.rawAuthenticatorData.base64URLEncodedString(),
-            "clientDataJSON": assertion.rawClientDataJSON.base64URLEncodedString(),
-            "signature": assertion.signature.base64URLEncodedString(),
-            "userHandle": assertion.userID.base64URLEncodedString()
-        ]
+        "response": response
     ]
 
     // Extract PRF assertion result (macOS 15+)

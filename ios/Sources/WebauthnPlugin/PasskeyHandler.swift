@@ -164,9 +164,13 @@ extension PasskeyHandler: ASAuthorizationControllerDelegate, ASAuthorizationCont
 
 enum PasskeyHandlerError: LocalizedError {
     case unexpectedCredentialType
+    case missingAttestationObject
 
     var errorDescription: String? {
-        "Unexpected credential type in authorization response"
+        switch self {
+        case .unexpectedCredentialType: return "Unexpected credential type in authorization response"
+        case .missingAttestationObject: return "Registration returned no attestation object"
+        }
     }
 }
 
@@ -175,12 +179,15 @@ func registrationJSON(from auth: ASAuthorization) throws -> [String: Any] {
     guard let reg = auth.credential as? ASAuthorizationPublicKeyCredentialRegistration else {
         throw PasskeyHandlerError.unexpectedCredentialType
     }
+    guard let attestationObject = reg.rawAttestationObject else {
+        throw PasskeyHandlerError.missingAttestationObject
+    }
     var json: [String: Any] = [
         "id": reg.credentialID.base64URLEncodedString(),
         "rawId": reg.credentialID.base64URLEncodedString(),
         "type": "public-key",
         "response": [
-            "attestationObject": (reg.rawAttestationObject ?? Data()).base64URLEncodedString(),
+            "attestationObject": attestationObject.base64URLEncodedString(),
             "clientDataJSON": reg.rawClientDataJSON.base64URLEncodedString()
         ]
     ]
@@ -201,16 +208,19 @@ func assertionJSON(from auth: ASAuthorization) throws -> [String: Any] {
     guard let assertion = auth.credential as? ASAuthorizationPublicKeyCredentialAssertion else {
         throw PasskeyHandlerError.unexpectedCredentialType
     }
+    var response: [String: Any] = [
+        "authenticatorData": assertion.rawAuthenticatorData.base64URLEncodedString(),
+        "clientDataJSON": assertion.rawClientDataJSON.base64URLEncodedString(),
+        "signature": assertion.signature.base64URLEncodedString()
+    ]
+    if !assertion.userID.isEmpty {
+        response["userHandle"] = assertion.userID.base64URLEncodedString()
+    }
     var json: [String: Any] = [
         "id": assertion.credentialID.base64URLEncodedString(),
         "rawId": assertion.credentialID.base64URLEncodedString(),
         "type": "public-key",
-        "response": [
-            "authenticatorData": assertion.rawAuthenticatorData.base64URLEncodedString(),
-            "clientDataJSON": assertion.rawClientDataJSON.base64URLEncodedString(),
-            "signature": assertion.signature.base64URLEncodedString(),
-            "userHandle": assertion.userID.base64URLEncodedString()
-        ]
+        "response": response
     ]
 
     // Extract PRF assertion result (iOS 18+)
