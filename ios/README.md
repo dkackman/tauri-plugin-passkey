@@ -202,24 +202,24 @@ Example server-side registration options:
 
 The iOS plugin registers requests for both authenticator types:
 
-| Type | Provider | What it covers |
-| --- | --- | --- |
-| Platform | `ASAuthorizationPlatformPublicKeyCredentialProvider` | iCloud Keychain passkeys, third-party credential providers (1Password, etc.) |
-| Security Key | `ASAuthorizationSecurityKeyPublicKeyCredentialProvider` | USB/NFC/BLE FIDO2 security keys |
+| Type         | Provider                                                | What it covers                                                               |
+| ------------ | ------------------------------------------------------- | ---------------------------------------------------------------------------- |
+| Platform     | `ASAuthorizationPlatformPublicKeyCredentialProvider`    | iCloud Keychain passkeys, third-party credential providers (1Password, etc.) |
+| Security Key | `ASAuthorizationSecurityKeyPublicKeyCredentialProvider` | USB/NFC/BLE FIDO2 security keys                                              |
 
 iOS presents a unified system sheet that lets the user choose between available authenticators.
 
 ## Differences from macOS
 
-| Aspect | macOS | iOS |
-| --- | --- | --- |
-| Bridge mechanism | C-callable FFI via `swift-rs` | Tauri mobile plugin system |
-| Presentation anchor | `NSWindow` | `UIWindow` via `UIWindowScene` |
-| `?mode=developer` | Does **not** work with Developer ID builds | Works with development-signed builds |
-| Third-party providers | Not supported (no macOS Credential Provider API) | Supported via iOS Credential Provider API |
-| Minimum OS | macOS 13 (Ventura) | iOS 16 |
-| Code signing | Developer ID + provisioning profile + notarization | Xcode-managed development signing |
-| Build command | `pnpm tauri dev` | `pnpm tauri ios dev` |
+| Aspect                | macOS                                              | iOS                                       |
+| --------------------- | -------------------------------------------------- | ----------------------------------------- |
+| Bridge mechanism      | C-callable FFI via `swift-rs`                      | Tauri mobile plugin system                |
+| Presentation anchor   | `NSWindow`                                         | `UIWindow` via `UIWindowScene`            |
+| `?mode=developer`     | Does **not** work with Developer ID builds         | Works with development-signed builds      |
+| Third-party providers | Not supported (no macOS Credential Provider API)   | Supported via iOS Credential Provider API |
+| Minimum OS            | macOS 13 (Ventura)                                 | iOS 16                                    |
+| Code signing          | Developer ID + provisioning profile + notarization | Xcode-managed development signing         |
+| Build command         | `pnpm tauri dev`                                   | `pnpm tauri ios dev`                      |
 
 ## Limitations
 
@@ -229,12 +229,12 @@ iOS presents a unified system sheet that lets the user choose between available 
 
 ## Troubleshooting
 
-| Error | Cause | Fix |
-| --- | --- | --- |
-| "WebAuthn requires iOS 15.0 or later" | Running on an older iOS version | Update the device to iOS 16+ |
-| "Application not associated with domain X" | Domain association not validated | Check: AASA is hosted, entitlements include the domain, App ID has Associated Domains enabled |
-| "Failed to parse registration options JSON" | Malformed options from the Rust side | Verify your server returns valid WebAuthn options with all required fields |
-| "Failed to decode base64url fields" | Invalid base64url encoding in challenge or user ID | Ensure the server sends properly padded base64url strings |
-| No passkey sheet appears | Missing presentation anchor or not on main thread | This is handled by the plugin; file an issue if it occurs |
-| Xcode signing errors | Missing development team or provisioning profile | Set `developmentTeam` in tauri.conf.json or `APPLE_DEVELOPMENT_TEAM` env var |
-| `CARGO_CFG_TARGET_OS` build errors | Plugin build.rs trying to link macOS Swift on iOS target | Ensure the plugin's build.rs guards Swift linking with `CARGO_CFG_TARGET_OS == "macos"` |
+| Error                                       | Cause                                                    | Fix                                                                                           |
+| ------------------------------------------- | -------------------------------------------------------- | --------------------------------------------------------------------------------------------- |
+| "WebAuthn requires iOS 15.0 or later"       | Running on an older iOS version                          | Update the device to iOS 16+                                                                  |
+| "Application not associated with domain X"  | Domain association not validated                         | Check: AASA is hosted, entitlements include the domain, App ID has Associated Domains enabled |
+| "Failed to parse registration options JSON" | Malformed options from the Rust side                     | Verify your server returns valid WebAuthn options with all required fields                    |
+| "Failed to decode base64url fields"         | Invalid base64url encoding in challenge or user ID       | Ensure the server sends properly padded base64url strings                                     |
+| No passkey sheet appears                    | Missing presentation anchor or not on main thread        | This is handled by the plugin; file an issue if it occurs                                     |
+| Xcode signing errors                        | Missing development team or provisioning profile         | Set `developmentTeam` in tauri.conf.json or `APPLE_DEVELOPMENT_TEAM` env var                  |
+| `CARGO_CFG_TARGET_OS` build errors          | Plugin build.rs trying to link macOS Swift on iOS target | Ensure the plugin's build.rs guards Swift linking with `CARGO_CFG_TARGET_OS == "macos"`       |

@@ -15,7 +15,11 @@
     selectKey
   } from 'tauri-plugin-webauthn-api';
 
-  type LogEntry = { time: string; level: 'info' | 'error' | 'action' | 'success'; message: string };
+  type LogEntry = {
+    time: string;
+    level: 'info' | 'error' | 'action' | 'success';
+    message: string;
+  };
 
   let name = $state('');
   let authName = $state('');
@@ -60,7 +64,10 @@
     if (saved) {
       try {
         const config = JSON.parse(saved);
-        await invoke('set_rp_config', { rpId: config.rp_id, rpOrigin: config.rp_origin });
+        await invoke('set_rp_config', {
+          rpId: config.rp_id,
+          rpOrigin: config.rp_origin
+        });
         rpId = config.rp_id;
         rpOrigin = config.rp_origin;
         return;
@@ -69,17 +76,24 @@
       }
     }
     // Fall back to backend defaults (from env vars or hardcoded)
-    const config: { rp_id: string; rp_origin: string } = await invoke('get_rp_config');
+    const config: { rp_id: string; rp_origin: string } =
+      await invoke('get_rp_config');
     rpId = config.rp_id;
     rpOrigin = config.rp_origin;
   }
 
   async function saveSettings() {
     try {
-      await invoke('set_rp_config', { rpId: settingsRpId, rpOrigin: settingsRpOrigin });
+      await invoke('set_rp_config', {
+        rpId: settingsRpId,
+        rpOrigin: settingsRpOrigin
+      });
       rpId = settingsRpId;
       rpOrigin = settingsRpOrigin;
-      localStorage.setItem('webauthn_rp_config', JSON.stringify({ rp_id: rpId, rp_origin: rpOrigin }));
+      localStorage.setItem(
+        'webauthn_rp_config',
+        JSON.stringify({ rp_id: rpId, rp_origin: rpOrigin })
+      );
       showSettings = false;
       log('success', `RP config updated: ${rpId} (${rpOrigin})`);
     } catch (e: any) {
@@ -134,8 +148,10 @@
     needsPin = false;
     try {
       log('info', 'Starting discoverable authentication...');
-      let options: PublicKeyCredentialRequestOptionsJSON =
-        await invoke('auth_start', { salt1: prfSalt1 || null, salt2: prfSalt2 || null });
+      let options: PublicKeyCredentialRequestOptionsJSON = await invoke(
+        'auth_start',
+        { salt1: prfSalt1 || null, salt2: prfSalt2 || null }
+      );
       log('info', 'Got challenge. Waiting for authenticator...');
       log('action', 'Use Touch ID, security key, or passkey now.');
 
@@ -209,7 +225,10 @@
     registerListener((event) => {
       switch (event.type) {
         case WebauthnEventType.SelectDevice:
-          log('action', 'Multiple devices found. Touch the one you want to use.');
+          log(
+            'action',
+            'Multiple devices found. Touch the one you want to use.'
+          );
           break;
         case WebauthnEventType.PresenceRequired:
           log('action', 'Touch your authenticator to confirm.');
@@ -222,12 +241,16 @@
               break;
             case PinEventType.InvalidPin:
               needsPin = true;
-              log('error',
+              log(
+                'error',
                 `Invalid PIN.${event.event.attempts_remaining ? ` ${event.event.attempts_remaining} attempts remaining.` : ''}`
               );
               break;
             case PinEventType.PinAuthBlocked:
-              log('error', 'PIN authentication blocked. Remove and re-insert device.');
+              log(
+                'error',
+                'PIN authentication blocked. Remove and re-insert device.'
+              );
               needsPin = false;
               break;
             case PinEventType.PinBlocked:
@@ -235,7 +258,8 @@
               needsPin = false;
               break;
             case PinEventType.InvalidUv:
-              log('error',
+              log(
+                'error',
                 `Invalid user verification.${event.event.attempts_remaining ? ` ${event.event.attempts_remaining} attempts remaining.` : ''}`
               );
               break;
@@ -256,25 +280,57 @@
 <main class="container">
   <div class="header">
     <h2>WebAuthn Example</h2>
-    <button class="settings-btn" onclick={() => openSettings()} title="Settings"><svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg></button>
+    <button class="settings-btn" onclick={() => openSettings()} title="Settings"
+      ><svg
+        xmlns="http://www.w3.org/2000/svg"
+        width="18"
+        height="18"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        stroke-width="2"
+        stroke-linecap="round"
+        stroke-linejoin="round"
+        ><circle cx="12" cy="12" r="3" /><path
+          d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"
+        /></svg
+      ></button
+    >
   </div>
 
   {#if showSettings}
     <section class="settings-modal">
       <h3>RP Configuration</h3>
-      <form onsubmit={(e) => { e.preventDefault(); saveSettings(); }}>
+      <form
+        onsubmit={(e) => {
+          e.preventDefault();
+          saveSettings();
+        }}
+      >
         <label>
           RP ID
-          <input bind:value={settingsRpId} placeholder="e.g. webauthn.dkackman.com" />
+          <input
+            bind:value={settingsRpId}
+            placeholder="e.g. webauthn.dkackman.com"
+          />
         </label>
         <label>
           RP Origin
-          <input bind:value={settingsRpOrigin} placeholder="e.g. https://webauthn.dkackman.com" />
+          <input
+            bind:value={settingsRpOrigin}
+            placeholder="e.g. https://webauthn.dkackman.com"
+          />
         </label>
         <div class="settings-actions">
           <button type="submit">Save</button>
-          <button type="button" class="secondary" onclick={() => showSettings = false}>Cancel</button>
-          <button type="button" class="danger" onclick={resetSettings}>Reset to Defaults</button>
+          <button
+            type="button"
+            class="secondary"
+            onclick={() => (showSettings = false)}>Cancel</button
+          >
+          <button type="button" class="danger" onclick={resetSettings}
+            >Reset to Defaults</button
+          >
         </div>
       </form>
     </section>
@@ -283,7 +339,13 @@
   <section class="actions">
     <div class="action-group">
       <h3>Register</h3>
-      <form class="row" onsubmit={(e) => { e.preventDefault(); reg(); }}>
+      <form
+        class="row"
+        onsubmit={(e) => {
+          e.preventDefault();
+          reg();
+        }}
+      >
         <input placeholder="Username" bind:value={name} disabled={busy} />
         <label class="checkbox-label">
           <input type="checkbox" bind:checked={enablePrf} disabled={busy} />
@@ -296,22 +358,64 @@
     <div class="action-group">
       <h3>Authenticate (discoverable)</h3>
       <div class="row">
-        <input placeholder="Salt 1 (32 bytes, base64url)" bind:value={prfSalt1} disabled={busy} />
-        <button type="button" class="secondary small" onclick={() => prfSalt1 = generateSalt()} disabled={busy}>Gen</button>
-        <input placeholder="Salt 2 (32 bytes, base64url)" bind:value={prfSalt2} disabled={busy} />
-        <button type="button" class="secondary small" onclick={() => prfSalt2 = generateSalt()} disabled={busy}>Gen</button>
+        <input
+          placeholder="Salt 1 (32 bytes, base64url)"
+          bind:value={prfSalt1}
+          disabled={busy}
+        />
+        <button
+          type="button"
+          class="secondary small"
+          onclick={() => (prfSalt1 = generateSalt())}
+          disabled={busy}>Gen</button
+        >
+        <input
+          placeholder="Salt 2 (32 bytes, base64url)"
+          bind:value={prfSalt2}
+          disabled={busy}
+        />
+        <button
+          type="button"
+          class="secondary small"
+          onclick={() => (prfSalt2 = generateSalt())}
+          disabled={busy}>Gen</button
+        >
         <button onclick={auth} disabled={busy}>Authenticate</button>
       </div>
     </div>
 
     <div class="action-group">
       <h3>Authenticate (by username)</h3>
-      <form class="row" onsubmit={(e) => { e.preventDefault(); auth_non_discoverable(); }}>
+      <form
+        class="row"
+        onsubmit={(e) => {
+          e.preventDefault();
+          auth_non_discoverable();
+        }}
+      >
         <input placeholder="Username" bind:value={authName} disabled={busy} />
-        <input placeholder="Salt 1 (32 bytes, base64url)" bind:value={prfSalt1} disabled={busy} />
-        <button type="button" class="secondary small" onclick={() => prfSalt1 = generateSalt()} disabled={busy}>Gen</button>
-        <input placeholder="Salt 2 (32 bytes, base64url)" bind:value={prfSalt2} disabled={busy} />
-        <button type="button" class="secondary small" onclick={() => prfSalt2 = generateSalt()} disabled={busy}>Gen</button>
+        <input
+          placeholder="Salt 1 (32 bytes, base64url)"
+          bind:value={prfSalt1}
+          disabled={busy}
+        />
+        <button
+          type="button"
+          class="secondary small"
+          onclick={() => (prfSalt1 = generateSalt())}
+          disabled={busy}>Gen</button
+        >
+        <input
+          placeholder="Salt 2 (32 bytes, base64url)"
+          bind:value={prfSalt2}
+          disabled={busy}
+        />
+        <button
+          type="button"
+          class="secondary small"
+          onclick={() => (prfSalt2 = generateSalt())}
+          disabled={busy}>Gen</button
+        >
         <button type="submit" disabled={busy}>Authenticate</button>
       </form>
     </div>
@@ -320,7 +424,13 @@
   {#if needsPin}
     <section class="pin-prompt">
       <h3>PIN Required</h3>
-      <form class="row" onsubmit={(e) => { e.preventDefault(); pinSend(); }}>
+      <form
+        class="row"
+        onsubmit={(e) => {
+          e.preventDefault();
+          pinSend();
+        }}
+      >
         <input placeholder="Enter PIN" type="password" bind:value={pin} />
         <button type="submit">Submit PIN</button>
       </form>
@@ -353,7 +463,15 @@
     {#each logs as entry}
       <div class="log-entry {entry.level}">
         <span class="log-time">{entry.time}</span>
-        <span class="log-badge">{entry.level === 'action' ? 'ACTION' : entry.level === 'success' ? 'OK' : entry.level === 'error' ? 'ERROR' : 'INFO'}</span>
+        <span class="log-badge"
+          >{entry.level === 'action'
+            ? 'ACTION'
+            : entry.level === 'success'
+              ? 'OK'
+              : entry.level === 'error'
+                ? 'ERROR'
+                : 'INFO'}</span
+        >
         <span class="log-msg">{entry.message}</span>
       </div>
     {/each}
@@ -362,7 +480,9 @@
 
 <style>
   :root {
-    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+    font-family:
+      -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial,
+      sans-serif;
     font-size: 14px;
     line-height: 1.5;
     color: #1a1a1a;
@@ -416,7 +536,7 @@
     border-radius: 8px;
     padding: 1rem;
     margin-bottom: 1rem;
-    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
   }
   .settings-modal label {
     display: block;
@@ -459,7 +579,7 @@
     background: #fff;
     border-radius: 8px;
     padding: 1rem;
-    box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
   }
 
   .row {
@@ -602,13 +722,31 @@
     word-break: break-word;
   }
 
-  .info .log-badge { background: #2a4a7f; color: #8cb4ff; }
-  .error .log-badge { background: #7f2a2a; color: #ff8c8c; }
-  .error .log-msg { color: #ff8c8c; }
-  .action .log-badge { background: #7f6a2a; color: #ffd666; }
-  .action .log-msg { color: #ffd666; }
-  .success .log-badge { background: #2a7f3a; color: #8cff8c; }
-  .success .log-msg { color: #8cff8c; }
+  .info .log-badge {
+    background: #2a4a7f;
+    color: #8cb4ff;
+  }
+  .error .log-badge {
+    background: #7f2a2a;
+    color: #ff8c8c;
+  }
+  .error .log-msg {
+    color: #ff8c8c;
+  }
+  .action .log-badge {
+    background: #7f6a2a;
+    color: #ffd666;
+  }
+  .action .log-msg {
+    color: #ffd666;
+  }
+  .success .log-badge {
+    background: #2a7f3a;
+    color: #8cff8c;
+  }
+  .success .log-msg {
+    color: #8cff8c;
+  }
 
   @media (prefers-color-scheme: dark) {
     :root {
@@ -617,7 +755,7 @@
     }
     .action-group {
       background: #2a2a2a;
-      box-shadow: 0 1px 3px rgba(0,0,0,0.3);
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
     }
     input {
       background: #333;
@@ -627,8 +765,12 @@
     input:focus {
       background: #3a3a3a;
     }
-    h2 { color: #e0e0e0; }
-    .console { background: #111; }
+    h2 {
+      color: #e0e0e0;
+    }
+    .console {
+      background: #111;
+    }
     .settings-btn {
       border-color: #444;
       color: #999;

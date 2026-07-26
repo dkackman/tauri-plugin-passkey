@@ -28,6 +28,7 @@
 **Why:** On Linux the plugin itself acts as the WebAuthn client, and today it accepts any `origin` + `rp.id` pair from the webview. XSS in the webview can mint assertions for arbitrary sites (e.g. `origin: "https://github.com"`). Browsers enforce that the rpId is a "registrable suffix" of the origin host; we add that check for all platforms in the shared command layer.
 
 **Files:**
+
 - Create: `scripts/test-macos.sh`
 - Create: `src/validation.rs`
 - Modify: `src/lib.rs` (add `mod validation;`)
@@ -35,6 +36,7 @@
 - Modify: `src/commands.rs` (call the validator in `register` and `authenticate`)
 
 **Interfaces:**
+
 - Produces: `pub fn validate_rp_id(origin: &tauri::Url, rp_id: &str) -> crate::Result<()>` in `src/validation.rs` — later tasks do not depend on it, but Task 2 adds a second function to the same file.
 - Produces: `crate::Error::Validation(String)` — display format `"Validation error: {0}"`.
 
@@ -214,10 +216,12 @@ git commit -m "fix(security): validate rpId is a registrable suffix of the origi
 **Why:** On Linux the plugin builds `clientDataJSON` with `origin` typed as `Url`, which serializes `https://example.com` as `https://example.com/` (trailing slash). Server libraries that string-compare `expectedOrigin` (e.g. @simplewebauthn/server) reject every response. The fix builds the JSON with the origin's ASCII serialization (`https://example.com`, no slash) — the same form browsers emit.
 
 **Files:**
+
 - Modify: `src/validation.rs` (add `build_client_data` + tests — this file compiles on every platform, so the tests run on macOS)
 - Modify: `src/authenticators/ctap2/platform.rs` (use it; Linux-compile-only, verified via CI in Task 5)
 
 **Interfaces:**
+
 - Consumes: nothing from other tasks.
 - Produces: `pub fn build_client_data(type_: &str, challenge: &base64urlsafedata::Base64UrlSafeData, origin: &tauri::Url) -> crate::Result<Vec<u8>>` — returns the serialized clientDataJSON bytes.
 
@@ -312,11 +316,13 @@ git commit -m "fix(ctap2): serialize clientDataJSON origin without trailing slas
 **Why:** `PasskeyHandler.cancel()` resumes the Rust caller but never calls `ASAuthorizationController.cancel()`, so the system passkey dialog stays on screen. Also, when the Rust side times out (`recv_timeout` in `macos.rs`), nothing cancels the Swift side at all — stale sheet plus leaked handler.
 
 **Files:**
+
 - Modify: `macos/Sources/WebauthnBridge/PasskeyHandler.swift` (the `cancel()` func, currently lines 96–102)
 - Modify: `ios/Sources/WebauthnPlugin/PasskeyHandler.swift` (the `cancel()` func, currently lines 97–103 — identical shape)
 - Modify: `src/authenticators/macos.rs` (`await_swift_result`, currently lines 203–215)
 
 **Interfaces:**
+
 - Consumes: existing FFI export `webauthn_cancel()` (already declared in `macos.rs` `extern "C"` block).
 - Produces: nothing new — behavior fix only.
 
@@ -389,9 +395,11 @@ git commit -m "fix(apple): dismiss the passkey sheet on cancel and on Rust-side 
 **Why:** `mobile.rs` invokes a `cancel` command on both mobile platforms, but the Android plugin doesn't define one — the call silently errors and the CredentialManager coroutine keeps running.
 
 **Files:**
+
 - Modify: `android/src/main/java/WebauthnPlugin.kt`
 
 **Interfaces:**
+
 - Consumes: the existing Rust call `self.0.run_mobile_plugin("cancel", ())` in `mobile.rs` (already present — no Rust change needed).
 - Produces: `@Command fun cancel(invoke: Invoke)` on the Android plugin.
 
@@ -454,6 +462,7 @@ git commit -m "fix(android): implement cancel command and stop swallowing corout
 **Why:** There are zero tests in CI and the Linux-only ctap2 module cannot even be compiled on the macOS dev machine. This workflow gives every later ctap2 task its verification story. It deliberately uses plain `pull_request` (not `pull_request_target`) so untrusted PR code never runs with elevated tokens.
 
 **Files:**
+
 - Create: `.github/workflows/test.yml`
 
 **Interfaces:** none consumed/produced in code; later tasks cite this job as their Linux verification.
@@ -485,7 +494,7 @@ jobs:
           version: 1.1
       - uses: Swatinem/rust-cache@v2
         with:
-          shared-key: "test_cache_linux"
+          shared-key: 'test_cache_linux'
       - run: cargo test -p tauri-plugin-webauthn
 
   macos:
@@ -496,7 +505,7 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
         with:
-          shared-key: "test_cache_macos"
+          shared-key: 'test_cache_macos'
       - run: cargo test -p tauri-plugin-webauthn
 ```
 
@@ -523,10 +532,12 @@ After this commit, pushing the branch and opening a PR runs the Linux job — th
 **Why:** On Linux, `register`/`authenticate` hold the `manager` mutex for their entire blocking wait, and `cancel()` needs the same mutex — so cancel can never fire during the only window where it matters. Fix: lock only around the non-blocking dispatch call (`AuthenticatorService::register/sign` spawn transport threads and return), then wait on the result channel without the lock.
 
 **Files:**
+
 - Modify: `src/authenticators/ctap2/platform.rs` (change `perform_register` / `perform_authentication` from trait methods on `AuthenticatorService` to free functions taking `&Mutex<AuthenticatorService>`)
 - Modify: `src/authenticators/ctap2/mod.rs` (call sites; delete the trait import)
 
 **Interfaces:**
+
 - Consumes: `crate::validation::build_client_data` (Task 2).
 - Produces (used by `mod.rs` in this same task):
   - `pub fn perform_register(manager: &Mutex<AuthenticatorService>, status_tx: Sender<StatusUpdate>, url: Url, options: PublicKeyCredentialCreationOptions, timeout: u64) -> crate::Result<RegisterPublicKeyCredential>`
@@ -614,13 +625,16 @@ git commit -m "fix(ctap2): release manager lock during blocking wait so cancel()
 **Why:** The Linux backend hardcodes `exclude_list: Vec::new()`, `allow_list: Vec::new()`, and forces UV and resident-key to `Required`. Consequences today: duplicate registrations are possible, non-discoverable credentials can never authenticate, and server policies are ignored.
 
 **Files:**
+
 - Modify: `src/authenticators/ctap2/platform.rs`
 
 **Interfaces:**
+
 - Consumes: `perform_register`/`perform_authentication` shapes from Task 6.
 - Produces: private conversion helpers used only inside this file (exact signatures below).
 
 Verified type facts (from vendored `authenticator-0.5.0` and `webauthn-rs-proto-0.5.4` sources — trust these over guesses):
+
 - `authenticator::ctap2::server::PublicKeyCredentialDescriptor { id: Vec<u8>, transports: Vec<Transport> }`; `Transport` variants: `USB, NFC, BLE, Internal`.
 - `authenticator` `UserVerificationRequirement` and `ResidentKeyRequirement` both have `Discouraged, Preferred, Required`.
 - proto `PublicKeyCredentialDescriptor`/`AllowCredentials` both have `id: Base64UrlSafeData`, `transports: Option<Vec<AuthenticatorTransport>>`.
@@ -718,7 +732,7 @@ In the `RegisterArgs` literal, replace the hardcoded fields:
       resident_key_req: convert_resident_key(options.authenticator_selection.as_ref()),
 ```
 
-Field-ordering caution: `options.exclude_credentials` and `options.authenticator_selection` are both moved/borrowed here — take `exclude_credentials` by move *after* the two `as_ref()` uses of `authenticator_selection`, or bind the converted values to locals above the struct literal (preferred):
+Field-ordering caution: `options.exclude_credentials` and `options.authenticator_selection` are both moved/borrowed here — take `exclude_credentials` by move _after_ the two `as_ref()` uses of `authenticator_selection`, or bind the converted values to locals above the struct literal (preferred):
 
 ```rust
     let user_verification_req = options
@@ -759,9 +773,11 @@ git commit -m "fix(ctap2): honor allow/exclude credential lists, userVerificatio
 **Why:** Registration responses currently return `id: ""` / `raw_id: []`, which standard server libraries reject; the credential id is available inside the attestation object. Assertions slice CBOR bytes with `data[2..]`, which silently corrupts authenticatorData once it exceeds 255 bytes; the crate provides `AuthenticatorData::to_vec()` which does this correctly.
 
 **Files:**
+
 - Modify: `src/authenticators/ctap2/platform.rs`
 
 **Interfaces:**
+
 - Consumes: `perform_register`/`perform_authentication` from Task 6.
 
 Verified type facts: `AttestationObject { auth_data: AuthenticatorData, att_stmt: ... }`; `AuthenticatorData { rp_id_hash, flags, counter, credential_data: Option<AttestedCredentialData>, extensions }`; `AttestedCredentialData { aaguid, credential_id: Vec<u8>, credential_public_key }`; `AuthenticatorData::to_vec(&self) -> Vec<u8>` exists and yields the raw (non-CBOR-wrapped) bytes.
@@ -830,9 +846,11 @@ git commit -m "fix(ctap2): return real credential id and correctly-framed authen
 **Why:** The `selectKey` event carries `authenticator`-crate `PublicKeyCredentialUserEntity` values whose `id: Vec<u8>` serializes to a JSON **number array**, while `guest-js/index.ts` declares `AuthKey.id: string`. Emit our own struct with a base64url string id instead.
 
 **Files:**
+
 - Modify: `src/authenticators/ctap2/event.rs`
 
 **Interfaces:**
+
 - Consumes: nothing new.
 - Produces: event wire shape `{ type: "selectKey", keys: [{ id: "<base64url>", name?: string, displayName?: string }] }` — this now matches the existing TS `AuthKey` type, which needs no change.
 
@@ -906,6 +924,7 @@ git commit -m "fix(ctap2): emit selectKey user ids as base64url strings to match
 **Why:** The Apple backends drop `excludeCredentials` (duplicate registrations possible) and `user.displayName` (username shown twice in the passkey UI). Apple supports `excludedCredentials` on platform registration requests from macOS 14 / iOS 17.4, and on security-key registration requests unconditionally at our minimums.
 
 **Files:**
+
 - Modify: `src/authenticators/macos.rs` (FFI signature + call)
 - Modify: `macos/Sources/WebauthnBridge/Exports.swift` (`webauthn_register` export)
 - Modify: `macos/Sources/WebauthnBridge/PasskeyHandler.swift` (`register` params + requests)
@@ -913,6 +932,7 @@ git commit -m "fix(ctap2): emit selectKey user ids as base64url strings to match
 - Modify: `ios/Sources/WebauthnPlugin/PasskeyHandler.swift` (same as macOS handler)
 
 **Interfaces:**
+
 - Produces (new FFI contract — Rust and Swift must change in the same commit):
 
 ```
@@ -921,7 +941,7 @@ webauthn_register(domain, challenge_ptr, challenge_len, username, display_name,
                   prf_enabled, context, callback)
 ```
 
-  where `display_name: *const c_char` (never null; falls back to username) and `exclude_credentials_json: *const c_char` (nullable; JSON array of base64url credential-id strings — same encoding the authenticate path already uses for `allow_credentials_json`).
+where `display_name: *const c_char` (never null; falls back to username) and `exclude_credentials_json: *const c_char` (nullable; JSON array of base64url credential-id strings — same encoding the authenticate path already uses for `allow_credentials_json`).
 
 - [ ] **Step 1: Rust side (`src/authenticators/macos.rs`)**
 
@@ -1131,6 +1151,7 @@ git commit -m "feat(apple): pass excludeCredentials and displayName through to A
 **Why:** Two silent-corruption paths: a nil `rawAttestationObject` currently becomes an **empty** attestation object (guaranteed server rejection with a confusing error), and `userHandle` is always emitted even when empty (spec says omit when absent; some servers validate this).
 
 **Files:**
+
 - Modify: `macos/Sources/WebauthnBridge/Exports.swift` (`registrationJSON`, `assertionJSON`, `BridgeError`)
 - Modify: `ios/Sources/WebauthnPlugin/PasskeyHandler.swift` (same two funcs + `PasskeyHandlerError`)
 
@@ -1206,6 +1227,7 @@ git commit -m "fix(apple): reject missing attestation objects and omit empty use
 **Why:** README still lists iOS as unsupported (it now works); JSDoc claims cancel "does nothing on windows and mobile" (now stale on three platforms); provisioning profiles must never be committed.
 
 **Files:**
+
 - Modify: `README.md`
 - Modify: `guest-js/index.ts` (doc comments only)
 - Modify: `.gitignore`
@@ -1262,11 +1284,11 @@ Record these in the PR description; they need the maintainer's call, not code:
 
 ## Verification matrix (which check proves which task)
 
-| Task | Local proof | CI proof |
-|------|-------------|----------|
-| 1, 2 | `./scripts/test-macos.sh` (unit tests run on macOS) | both jobs |
-| 3, 10, 11 | `xcrun swift build` + `./scripts/test-macos.sh` link | macOS job |
-| 4 | diff review (no Android toolchain assumed) | none (manual device test) |
-| 5 | YAML lint | the workflow itself |
-| 6, 7, 8, 9 | `./scripts/test-macos.sh` proves no cross-platform breakage only | Linux job compiles ctap2 |
-| 12 | `git status` / reading | n/a |
+| Task       | Local proof                                                      | CI proof                  |
+| ---------- | ---------------------------------------------------------------- | ------------------------- |
+| 1, 2       | `./scripts/test-macos.sh` (unit tests run on macOS)              | both jobs                 |
+| 3, 10, 11  | `xcrun swift build` + `./scripts/test-macos.sh` link             | macOS job                 |
+| 4          | diff review (no Android toolchain assumed)                       | none (manual device test) |
+| 5          | YAML lint                                                        | the workflow itself       |
+| 6, 7, 8, 9 | `./scripts/test-macos.sh` proves no cross-platform breakage only | Linux job compiles ctap2  |
+| 12         | `git status` / reading                                           | n/a                       |
