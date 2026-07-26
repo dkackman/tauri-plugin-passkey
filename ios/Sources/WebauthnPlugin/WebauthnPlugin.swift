@@ -10,6 +10,7 @@ private struct RegistrationOptions: Decodable {
     let user: User
     let challenge: String
     let extensions: RegistrationExtensions?
+    let excludeCredentials: [CredentialDescriptor]?
 
     struct RelyingParty: Decodable {
         let id: String
@@ -18,6 +19,11 @@ private struct RegistrationOptions: Decodable {
     struct User: Decodable {
         let id: String
         let name: String
+        let displayName: String?
+    }
+
+    struct CredentialDescriptor: Decodable {
+        let id: String
     }
 
     // webauthn-rs-proto serializes RequestRegistrationExtensions with
@@ -89,6 +95,7 @@ class WebauthnPlugin: Plugin {
         }
 
         let prfEnabled = options.extensions?.hmacCreateSecret ?? false
+        let excluded = (options.excludeCredentials ?? []).compactMap { base64URLDecode($0.id) }
 
         Task { @MainActor in
             let handler = PasskeyHandler()
@@ -99,7 +106,9 @@ class WebauthnPlugin: Plugin {
                     domain: options.rp.id,
                     challenge: challengeData,
                     username: options.user.name,
+                    displayName: options.user.displayName ?? options.user.name,
                     userID: userIDData,
+                    excludeCredentials: excluded,
                     prfEnabled: prfEnabled
                 )
                 let json = try registrationJSON(from: auth)

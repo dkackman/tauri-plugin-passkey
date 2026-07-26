@@ -24,8 +24,10 @@ public func webauthnRegister(
     challengePtr: UnsafePointer<UInt8>,
     challengeLen: UInt,
     username: UnsafePointer<CChar>,
+    displayName: UnsafePointer<CChar>,
     userIdPtr: UnsafePointer<UInt8>,
     userIdLen: UInt,
+    excludeCredentialsJson: UnsafePointer<CChar>?,
     prfEnabled: UInt8,
     context: UInt64,
     callback: WebauthnCallback
@@ -33,8 +35,18 @@ public func webauthnRegister(
     let domainStr = String(cString: domain)
     let challengeData = Data(bytes: challengePtr, count: Int(challengeLen))
     let usernameStr = String(cString: username)
+    let displayNameStr = String(cString: displayName)
     let userIdData = Data(bytes: userIdPtr, count: Int(userIdLen))
     let wantPrf = prfEnabled != 0
+
+    var excludedCredentials: [Data] = []
+    if let jsonPtr = excludeCredentialsJson {
+        let jsonStr = String(cString: jsonPtr)
+        if let jsonData = jsonStr.data(using: .utf8),
+           let arr = try? JSONSerialization.jsonObject(with: jsonData) as? [String] {
+            excludedCredentials = arr.compactMap { base64URLDecode($0) }
+        }
+    }
 
     Task { @MainActor in
         let handler = PasskeyHandler()
@@ -45,7 +57,9 @@ public func webauthnRegister(
                 domain: domainStr,
                 challenge: challengeData,
                 username: usernameStr,
+                displayName: displayNameStr,
                 userID: userIdData,
+                excludeCredentials: excludedCredentials,
                 prfEnabled: wantPrf
             )
 
