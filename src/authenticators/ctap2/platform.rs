@@ -98,16 +98,26 @@ impl AuthenticatorExt for AuthenticatorService {
     };
 
     let (register_tx, register_rx) = channel();
-    let callback = StateCallback::new(Box::new(move |rv| register_tx.send(rv).unwrap()));
+    let callback = StateCallback::new(Box::new(move |rv| {
+      let _ = register_tx.send(rv);
+    }));
 
+    // `args` carries the hmac-secret/PRF inputs, which are key-derivation
+    // secrets — log only non-sensitive shape, never the struct itself.
     #[cfg(feature = "log")]
-    log::debug!("Registering with args: {args:?}");
+    log::debug!(
+      "Registering with rp_id={}, {} pub_cred_params",
+      args.relying_party.id,
+      args.pub_cred_params.len()
+    );
 
     self.register(timeout, args, status_tx, callback)?;
-    let result = register_rx.recv().unwrap()?;
+    let result = register_rx.recv().map_err(|_| {
+      crate::Error::Authenticator("Registration ended without a result".to_string())
+    })??;
 
     #[cfg(feature = "log")]
-    log::debug!("Register result: {result:?}");
+    log::debug!("Register succeeded");
 
     Ok(webauthn_rs_proto::RegisterPublicKeyCredential {
       extensions: convert_response_registration_extensions(result.extensions),
@@ -156,24 +166,34 @@ impl AuthenticatorExt for AuthenticatorService {
       user_verification_req: UserVerificationRequirement::Required,
       use_ctap1_fallback: false,
       allow_list: Vec::new(),
-      extensions: convert_request_authentication_extensions(options.extensions),
+      extensions: convert_request_authentication_extensions(options.extensions)?,
     };
 
     let (sign_tx, sign_rx) = channel();
     let callback = StateCallback::new(Box::new(move |rv| {
-      sign_tx.send(rv).unwrap();
+      let _ = sign_tx.send(rv);
     }));
 
+    // `args.extensions` carries the PRF salts — see perform_register.
     #[cfg(feature = "log")]
-    log::debug!("Signing with args: {args:?}");
+    log::debug!("Signing with rp_id={}", args.relying_party_id);
 
     self.sign(timeout, args, status_tx, callback)?;
-    let result = sign_rx.recv().unwrap()?;
+    let result = sign_rx.recv().map_err(|_| {
+      crate::Error::Authenticator("Authentication ended without a result".to_string())
+    })??;
 
+    // The sign result contains the PRF outputs — do not log it.
     #[cfg(feature = "log")]
-    log::debug!("Sign result: {result:?}");
+    log::debug!("Sign succeeded");
 
-    let raw_id = result.assertion.credentials.unwrap().id;
+    // `credentials` is legitimately absent when a single discoverable
+    // credential matched, so fall back to an empty id rather than panicking.
+    let raw_id = result
+      .assertion
+      .credentials
+      .map(|c| c.id)
+      .unwrap_or_default();
     let data = serde_cbor_2::to_vec(&result.assertion.auth_data)?;
 
     Ok(PublicKeyCredential {
@@ -220,8 +240,9 @@ pub fn status<R: Runtime>(
       _ => (),
     }
 
-    let event: WebauthnEvent = status.into();
-    let _ = app_handle.emit(EVENT_NAME, event);
+    if let Some(event) = WebauthnEvent::from_status(status) {
+      let _ = app_handle.emit(EVENT_NAME, event);
+    }
   });
   status_tx
 }
@@ -240,19 +261,35 @@ fn convert_response_authentication_extensions(
   }
 }
 
+/// PRF salts are supplied by the webview and must be exactly 32 bytes;
+/// anything else is a caller error rather than a reason to panic.
+fn convert_salt(salt: Vec<u8>) -> crate::Result<[u8; 32]> {
+  let len = salt.len();
+  salt
+    .try_into()
+    .map_err(|_| crate::Error::Authenticator(format!("PRF salt must be 32 bytes, got {len}")))
+}
+
 fn convert_request_authentication_extensions(
   extensions: Option<RequestAuthenticationExtensions>,
-) -> AuthenticationExtensionsClientInputs {
-  extensions
-    .map(|e| AuthenticationExtensionsClientInputs {
-      app_id: e.appid,
-      hmac_get_secret: e.hmac_get_secret.map(|h| HMACGetSecretInput {
-        salt1: h.output1.to_vec().try_into().unwrap(),
-        salt2: h.output2.map(|s| s.to_vec().try_into().unwrap()),
-      }),
-      ..Default::default()
-    })
-    .unwrap_or_default()
+) -> crate::Result<AuthenticationExtensionsClientInputs> {
+  let Some(e) = extensions else {
+    return Ok(AuthenticationExtensionsClientInputs::default());
+  };
+
+  let hmac_get_secret = match e.hmac_get_secret {
+    Some(h) => Some(HMACGetSecretInput {
+      salt1: convert_salt(h.output1.to_vec())?,
+      salt2: h.output2.map(|s| convert_salt(s.to_vec())).transpose()?,
+    }),
+    None => None,
+  };
+
+  Ok(AuthenticationExtensionsClientInputs {
+    app_id: e.appid,
+    hmac_get_secret,
+    ..Default::default()
+  })
 }
 
 fn convert_request_registration_extensions(

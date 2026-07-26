@@ -1,0 +1,492 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 77;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		01972ABCDD40425C000079EE /* Metal.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 054F6D10F9CCF6187DF2EEB3 /* Metal.framework */; };
+		1551929C95374EB9ED6C7198 /* libapp.a in Resources */ = {isa = PBXBuildFile; fileRef = 5C6822BE9350B30EDD7505D2 /* libapp.a */; };
+		35D63C0183E5481CBEF243F2 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 1E6FF4D9E5A0B4B507C436C1 /* Assets.xcassets */; };
+		45617086E449D933127E800C /* CoreGraphics.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 32548C13F77F1A45782A958A /* CoreGraphics.framework */; };
+		58A645ABE8222A2CAB394CA0 /* libapp.a in Frameworks */ = {isa = PBXBuildFile; fileRef = B0BA5F1BF7E0B5D458D6015C /* libapp.a */; };
+		7C93093FC52C62A78AB39F28 /* QuartzCore.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 790C64D6FFDE9A4234745220 /* QuartzCore.framework */; };
+		89ACC34AC368F6534FB65A00 /* LaunchScreen.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = 184F696AA4B7E15DA5D4663F /* LaunchScreen.storyboard */; };
+		94BA9A74D6E5FEC783C92090 /* assets in Resources */ = {isa = PBXBuildFile; fileRef = C4BDB541AD1A45FFF7F3A7D2 /* assets */; };
+		9DC248370BC195DC95F47BC4 /* main.mm in Sources */ = {isa = PBXBuildFile; fileRef = 8DD71BE9B66D5B15437E8481 /* main.mm */; };
+		9FE85F2A8D2D43171987A0F8 /* Security.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 90059B6DF69357D0A0AB9A9A /* Security.framework */; };
+		A783D0D64FDB88F9121DB830 /* WebKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 72ED7203A9828AE8E53E689A /* WebKit.framework */; };
+		DA502C5699DD1CE6C9DF54EF /* MetalKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 4E833FB427798FE0CD48DBC8 /* MetalKit.framework */; };
+		DB739A4C53A5647B2B986FF8 /* UIKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 211A0047C3A7011525B291AD /* UIKit.framework */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXFileReference section */
+		054F6D10F9CCF6187DF2EEB3 /* Metal.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Metal.framework; path = System/Library/Frameworks/Metal.framework; sourceTree = SDKROOT; };
+		124E1DDD730201D543715431 /* main.rs */ = {isa = PBXFileReference; path = main.rs; sourceTree = "<group>"; };
+		184F696AA4B7E15DA5D4663F /* LaunchScreen.storyboard */ = {isa = PBXFileReference; lastKnownFileType = file.storyboard; path = LaunchScreen.storyboard; sourceTree = "<group>"; };
+		1E6FF4D9E5A0B4B507C436C1 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		211A0047C3A7011525B291AD /* UIKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = UIKit.framework; path = System/Library/Frameworks/UIKit.framework; sourceTree = SDKROOT; };
+		29B54A37D82FD41ED5ACB23A /* webauthn_iOS.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = webauthn_iOS.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		32548C13F77F1A45782A958A /* CoreGraphics.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = CoreGraphics.framework; path = System/Library/Frameworks/CoreGraphics.framework; sourceTree = SDKROOT; };
+		44032997FFC30D326425C4DF /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
+		4BF780930FE82C3F51326736 /* bindings.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = bindings.h; sourceTree = "<group>"; };
+		4E833FB427798FE0CD48DBC8 /* MetalKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = MetalKit.framework; path = System/Library/Frameworks/MetalKit.framework; sourceTree = SDKROOT; };
+		5C6822BE9350B30EDD7505D2 /* libapp.a */ = {isa = PBXFileReference; lastKnownFileType = archive.ar; path = libapp.a; sourceTree = "<group>"; };
+		72ED7203A9828AE8E53E689A /* WebKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = WebKit.framework; path = System/Library/Frameworks/WebKit.framework; sourceTree = SDKROOT; };
+		790C64D6FFDE9A4234745220 /* QuartzCore.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = QuartzCore.framework; path = System/Library/Frameworks/QuartzCore.framework; sourceTree = SDKROOT; };
+		8CFACF18637C49520683FEED /* lib.rs */ = {isa = PBXFileReference; path = lib.rs; sourceTree = "<group>"; };
+		8DD71BE9B66D5B15437E8481 /* main.mm */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.objcpp; path = main.mm; sourceTree = "<group>"; };
+		90059B6DF69357D0A0AB9A9A /* Security.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Security.framework; path = System/Library/Frameworks/Security.framework; sourceTree = SDKROOT; };
+		B0BA5F1BF7E0B5D458D6015C /* libapp.a */ = {isa = PBXFileReference; lastKnownFileType = archive.ar; path = libapp.a; sourceTree = "<group>"; };
+		C1BA711D9D4C809D7D355A33 /* webauthn_iOS.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = webauthn_iOS.entitlements; sourceTree = "<group>"; };
+		C4BDB541AD1A45FFF7F3A7D2 /* assets */ = {isa = PBXFileReference; lastKnownFileType = folder; path = assets; sourceTree = SOURCE_ROOT; };
+/* End PBXFileReference section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		2D69DB4058654E411E5E162A /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				58A645ABE8222A2CAB394CA0 /* libapp.a in Frameworks */,
+				45617086E449D933127E800C /* CoreGraphics.framework in Frameworks */,
+				01972ABCDD40425C000079EE /* Metal.framework in Frameworks */,
+				DA502C5699DD1CE6C9DF54EF /* MetalKit.framework in Frameworks */,
+				7C93093FC52C62A78AB39F28 /* QuartzCore.framework in Frameworks */,
+				9FE85F2A8D2D43171987A0F8 /* Security.framework in Frameworks */,
+				DB739A4C53A5647B2B986FF8 /* UIKit.framework in Frameworks */,
+				A783D0D64FDB88F9121DB830 /* WebKit.framework in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXGroup section */
+		15908B28E2CE593B6F3D057E /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				29B54A37D82FD41ED5ACB23A /* webauthn_iOS.app */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+		1B3ECA1D25BE366A1BBE6DF7 /* debug */ = {
+			isa = PBXGroup;
+			children = (
+				5C6822BE9350B30EDD7505D2 /* libapp.a */,
+			);
+			path = debug;
+			sourceTree = "<group>";
+		};
+		2A24162E57AB8DCE7A1AF882 /* Frameworks */ = {
+			isa = PBXGroup;
+			children = (
+				32548C13F77F1A45782A958A /* CoreGraphics.framework */,
+				B0BA5F1BF7E0B5D458D6015C /* libapp.a */,
+				054F6D10F9CCF6187DF2EEB3 /* Metal.framework */,
+				4E833FB427798FE0CD48DBC8 /* MetalKit.framework */,
+				790C64D6FFDE9A4234745220 /* QuartzCore.framework */,
+				90059B6DF69357D0A0AB9A9A /* Security.framework */,
+				211A0047C3A7011525B291AD /* UIKit.framework */,
+				72ED7203A9828AE8E53E689A /* WebKit.framework */,
+			);
+			name = Frameworks;
+			sourceTree = "<group>";
+		};
+		324DB91825206C33D6E62C0C /* Sources */ = {
+			isa = PBXGroup;
+			children = (
+				59EEFEA11CCDBFD004D8DEE4 /* webauthn */,
+			);
+			path = Sources;
+			sourceTree = "<group>";
+		};
+		55B41EB08AD536C90FC5398B = {
+			isa = PBXGroup;
+			children = (
+				C4BDB541AD1A45FFF7F3A7D2 /* assets */,
+				1E6FF4D9E5A0B4B507C436C1 /* Assets.xcassets */,
+				184F696AA4B7E15DA5D4663F /* LaunchScreen.storyboard */,
+				A2FEE81C9637AFB515E4137C /* Externals */,
+				324DB91825206C33D6E62C0C /* Sources */,
+				AC9D201B0E835E7195A5EF7C /* src */,
+				621896097EAA8D24CB7E2AB4 /* webauthn_iOS */,
+				2A24162E57AB8DCE7A1AF882 /* Frameworks */,
+				15908B28E2CE593B6F3D057E /* Products */,
+			);
+			sourceTree = "<group>";
+		};
+		59EEFEA11CCDBFD004D8DEE4 /* webauthn */ = {
+			isa = PBXGroup;
+			children = (
+				8DD71BE9B66D5B15437E8481 /* main.mm */,
+				C494FDBEC37A38883956870B /* bindings */,
+			);
+			path = webauthn;
+			sourceTree = "<group>";
+		};
+		621896097EAA8D24CB7E2AB4 /* webauthn_iOS */ = {
+			isa = PBXGroup;
+			children = (
+				44032997FFC30D326425C4DF /* Info.plist */,
+				C1BA711D9D4C809D7D355A33 /* webauthn_iOS.entitlements */,
+			);
+			path = webauthn_iOS;
+			sourceTree = "<group>";
+		};
+		6ABD1BF4ED7D7EE6547554D9 /* arm64 */ = {
+			isa = PBXGroup;
+			children = (
+				1B3ECA1D25BE366A1BBE6DF7 /* debug */,
+			);
+			path = arm64;
+			sourceTree = "<group>";
+		};
+		A2FEE81C9637AFB515E4137C /* Externals */ = {
+			isa = PBXGroup;
+			children = (
+				6ABD1BF4ED7D7EE6547554D9 /* arm64 */,
+			);
+			path = Externals;
+			sourceTree = "<group>";
+		};
+		AC9D201B0E835E7195A5EF7C /* src */ = {
+			isa = PBXGroup;
+			children = (
+				8CFACF18637C49520683FEED /* lib.rs */,
+				124E1DDD730201D543715431 /* main.rs */,
+			);
+			name = src;
+			path = ../../src;
+			sourceTree = "<group>";
+		};
+		C494FDBEC37A38883956870B /* bindings */ = {
+			isa = PBXGroup;
+			children = (
+				4BF780930FE82C3F51326736 /* bindings.h */,
+			);
+			path = bindings;
+			sourceTree = "<group>";
+		};
+		"TEMP_F92FAEC5-8A48-420B-A135-5422A0B08EE6" /* x86_64 */ = {
+			isa = PBXGroup;
+			children = (
+			);
+			path = x86_64;
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		CB86037FAE77A9DB1DD1B895 /* webauthn_iOS */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 772D36027B4BBC764E34EB20 /* Build configuration list for PBXNativeTarget "webauthn_iOS" */;
+			buildPhases = (
+				F38166A9BB860E122DED4835 /* Build Rust Code */,
+				453A80645A9A84A6AFDED087 /* Sources */,
+				57B98C6B2693E99BD67B76FA /* Resources */,
+				2D69DB4058654E411E5E162A /* Frameworks */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = webauthn_iOS;
+			packageProductDependencies = (
+			);
+			productName = webauthn_iOS;
+			productReference = 29B54A37D82FD41ED5ACB23A /* webauthn_iOS.app */;
+			productType = "com.apple.product-type.application";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		724880BDCE810FFC8AF7E2D0 /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = YES;
+				LastUpgradeCheck = 1430;
+				TargetAttributes = {
+					CB86037FAE77A9DB1DD1B895 = {
+						DevelopmentTeam = 86TDY6D9V2;
+					};
+				};
+			};
+			buildConfigurationList = 3C85D060554009944BC9063E /* Build configuration list for PBXProject "webauthn" */;
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				Base,
+				en,
+			);
+			mainGroup = 55B41EB08AD536C90FC5398B;
+			minimizedProjectReferenceProxies = 1;
+			preferredProjectObjectVersion = 77;
+			productRefGroup = 15908B28E2CE593B6F3D057E /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				CB86037FAE77A9DB1DD1B895 /* webauthn_iOS */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		57B98C6B2693E99BD67B76FA /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				35D63C0183E5481CBEF243F2 /* Assets.xcassets in Resources */,
+				89ACC34AC368F6534FB65A00 /* LaunchScreen.storyboard in Resources */,
+				94BA9A74D6E5FEC783C92090 /* assets in Resources */,
+				1551929C95374EB9ED6C7198 /* libapp.a in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
+
+/* Begin PBXShellScriptBuildPhase section */
+		F38166A9BB860E122DED4835 /* Build Rust Code */ = {
+			isa = PBXShellScriptBuildPhase;
+			alwaysOutOfDate = 1;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputFileListPaths = (
+			);
+			inputPaths = (
+			);
+			name = "Build Rust Code";
+			outputFileListPaths = (
+			);
+			outputPaths = (
+				"$(SRCROOT)/Externals/x86_64/${CONFIGURATION}/libapp.a",
+				"$(SRCROOT)/Externals/arm64/${CONFIGURATION}/libapp.a",
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "pnpm tauri ios xcode-script -v --platform ${PLATFORM_DISPLAY_NAME:?} --sdk-root ${SDKROOT:?} --framework-search-paths \"${FRAMEWORK_SEARCH_PATHS:?}\" --header-search-paths \"${HEADER_SEARCH_PATHS:?}\" --gcc-preprocessor-definitions \"${GCC_PREPROCESSOR_DEFINITIONS:-}\" --configuration ${CONFIGURATION:?} ${FORCE_COLOR} ${ARCHS:?}";
+		};
+/* End PBXShellScriptBuildPhase section */
+
+/* Begin PBXSourcesBuildPhase section */
+		453A80645A9A84A6AFDED087 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				9DC248370BC195DC95F47BC4 /* main.mm in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin XCBuildConfiguration section */
+		3C3489AC95C0240732506AAD /* debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_TESTABILITY = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"$(inherited)",
+					"DEBUG=1",
+				);
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 16.0;
+				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
+				MTL_FAST_MATH = YES;
+				ONLY_ACTIVE_ARCH = YES;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+				SWIFT_VERSION = 5.0;
+			};
+			name = debug;
+		};
+		6DCA56547AA11842A667BE09 /* debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_EMBED_SWIFT_STANDARD_LIBRARIES = YES;
+				ARCHS = (
+					arm64,
+				);
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_ENTITLEMENTS = webauthn_iOS/webauthn_iOS.entitlements;
+				CODE_SIGN_IDENTITY = "iPhone Developer";
+				DEVELOPMENT_TEAM = 86TDY6D9V2;
+				ENABLE_BITCODE = NO;
+				"EXCLUDED_ARCHS[sdk=iphoneos*]" = x86_64;
+				FRAMEWORK_SEARCH_PATHS = (
+					"$(inherited)",
+					"\".\"",
+				);
+				INFOPLIST_FILE = webauthn_iOS/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				"LIBRARY_SEARCH_PATHS[arch=arm64]" = "$(inherited) $(PROJECT_DIR)/Externals/arm64/$(CONFIGURATION) $(SDKROOT)/usr/lib/swift $(TOOLCHAIN_DIR)/usr/lib/swift/$(PLATFORM_NAME)";
+				"LIBRARY_SEARCH_PATHS[arch=x86_64]" = "$(inherited) $(PROJECT_DIR)/Externals/x86_64/$(CONFIGURATION) $(SDKROOT)/usr/lib/swift $(TOOLCHAIN_DIR)/usr/lib/swift/$(PLATFORM_NAME)";
+				PRODUCT_BUNDLE_IDENTIFIER = net.kackman.webauthn.example;
+				PRODUCT_NAME = "webauthn";
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				VALID_ARCHS = arm64;
+			};
+			name = debug;
+		};
+		E01555F42C2935557042A542 /* release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				ENABLE_NS_ASSERTIONS = NO;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 16.0;
+				MTL_ENABLE_DEBUG_INFO = NO;
+				MTL_FAST_MATH = YES;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SWIFT_COMPILATION_MODE = wholemodule;
+				SWIFT_OPTIMIZATION_LEVEL = "-O";
+				SWIFT_VERSION = 5.0;
+			};
+			name = release;
+		};
+		FB6C5A71D9454FEBB083016B /* release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_EMBED_SWIFT_STANDARD_LIBRARIES = YES;
+				ARCHS = (
+					arm64,
+				);
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_ENTITLEMENTS = webauthn_iOS/webauthn_iOS.entitlements;
+				CODE_SIGN_IDENTITY = "iPhone Developer";
+				DEVELOPMENT_TEAM = 86TDY6D9V2;
+				ENABLE_BITCODE = NO;
+				"EXCLUDED_ARCHS[sdk=iphoneos*]" = x86_64;
+				FRAMEWORK_SEARCH_PATHS = (
+					"$(inherited)",
+					"\".\"",
+				);
+				INFOPLIST_FILE = webauthn_iOS/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				"LIBRARY_SEARCH_PATHS[arch=arm64]" = "$(inherited) $(PROJECT_DIR)/Externals/arm64/$(CONFIGURATION) $(SDKROOT)/usr/lib/swift $(TOOLCHAIN_DIR)/usr/lib/swift/$(PLATFORM_NAME)";
+				"LIBRARY_SEARCH_PATHS[arch=x86_64]" = "$(inherited) $(PROJECT_DIR)/Externals/x86_64/$(CONFIGURATION) $(SDKROOT)/usr/lib/swift $(TOOLCHAIN_DIR)/usr/lib/swift/$(PLATFORM_NAME)";
+				PRODUCT_BUNDLE_IDENTIFIER = net.kackman.webauthn.example;
+				PRODUCT_NAME = "webauthn";
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				VALID_ARCHS = arm64;
+			};
+			name = release;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		3C85D060554009944BC9063E /* Build configuration list for PBXProject "webauthn" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				3C3489AC95C0240732506AAD /* debug */,
+				E01555F42C2935557042A542 /* release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = debug;
+		};
+		772D36027B4BBC764E34EB20 /* Build configuration list for PBXNativeTarget "webauthn_iOS" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				6DCA56547AA11842A667BE09 /* debug */,
+				FB6C5A71D9454FEBB083016B /* release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = debug;
+		};
+/* End XCConfigurationList section */
+	};
+	rootObject = 724880BDCE810FFC8AF7E2D0 /* Project object */;
+}

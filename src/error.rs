@@ -16,12 +16,22 @@ pub enum Error {
   SerdeJson(#[from] serde_json::Error),
   #[error("No token found")]
   NoToken,
-  #[error("Failed to create authenticator")]
-  Authenticator,
-  #[cfg(not(any(target_os = "android", target_os = "ios", target_os = "windows")))]
+  #[error("Authenticator error: {0}")]
+  Authenticator(String),
+  #[cfg(not(any(
+    target_os = "android",
+    target_os = "ios",
+    target_os = "windows",
+    target_os = "macos"
+  )))]
   #[error(transparent)]
   Ctap2(#[from] authenticator::errors::AuthenticatorError),
-  #[cfg(not(any(target_os = "android", target_os = "ios", target_os = "windows")))]
+  #[cfg(not(any(
+    target_os = "android",
+    target_os = "ios",
+    target_os = "windows",
+    target_os = "macos"
+  )))]
   #[error(transparent)]
   Cbor2(#[from] serde_cbor_2::Error),
 }

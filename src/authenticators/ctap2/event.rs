@@ -25,18 +25,23 @@ pub enum PinEvent {
   PinBlocked,
   InvalidUv { attempts_remaining: Option<u8> },
   UvBlocked,
+  PinIsTooShort,
+  PinIsTooLong { max_length: usize },
+  PinNotSet,
 }
 
-impl From<StatusUpdate> for WebauthnEvent {
-  fn from(status: StatusUpdate) -> Self {
+impl WebauthnEvent {
+  /// Returns `None` for status updates that have no user-facing equivalent
+  /// (interactive token management, which this plugin does not drive).
+  pub fn from_status(status: StatusUpdate) -> Option<Self> {
     match status {
-      StatusUpdate::SelectDeviceNotice => WebauthnEvent::SelectDevice,
-      StatusUpdate::PresenceRequired => WebauthnEvent::PresenceRequired,
-      StatusUpdate::PinUvError(event) => WebauthnEvent::PinEvent {
+      StatusUpdate::SelectDeviceNotice => Some(WebauthnEvent::SelectDevice),
+      StatusUpdate::PresenceRequired => Some(WebauthnEvent::PresenceRequired),
+      StatusUpdate::PinUvError(event) => Some(WebauthnEvent::PinEvent {
         event: event.into(),
-      },
-      StatusUpdate::SelectResultNotice(.., users) => WebauthnEvent::SelectKey { keys: users },
-      _ => unreachable!(),
+      }),
+      StatusUpdate::SelectResultNotice(.., users) => Some(WebauthnEvent::SelectKey { keys: users }),
+      StatusUpdate::InteractiveManagement(..) => None,
     }
   }
 }
@@ -54,7 +59,9 @@ impl From<StatusPinUv> for PinEvent {
         attempts_remaining: attempts,
       },
       StatusPinUv::UvBlocked => PinEvent::UvBlocked,
-      _ => unreachable!(),
+      StatusPinUv::PinIsTooShort => PinEvent::PinIsTooShort,
+      StatusPinUv::PinIsTooLong(max_length) => PinEvent::PinIsTooLong { max_length },
+      StatusPinUv::PinNotSet => PinEvent::PinNotSet,
     }
   }
 }

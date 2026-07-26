@@ -23,3 +23,8 @@ devenv.local.nix
 
 # direnv
 .direnv
+
+# Swift
+macos/.build/
+ios/.build/
+examples/webauthn/embedded.provisionprofile
