@@ -20,12 +20,10 @@ private struct RegistrationOptions: Decodable {
         let name: String
     }
 
+    // webauthn-rs-proto serializes RequestRegistrationExtensions with
+    // #[serde(rename_all = "camelCase")], so the wire key is `hmacCreateSecret`.
     struct RegistrationExtensions: Decodable {
         let hmacCreateSecret: Bool?
-
-        enum CodingKeys: String, CodingKey {
-            case hmacCreateSecret = "hmac_create_secret"
-        }
     }
 }
 
@@ -39,12 +37,9 @@ private struct AuthenticationOptions: Decodable {
         let id: String
     }
 
+    // See RegistrationExtensions: the wire key is `hmacGetSecret`.
     struct AuthenticationExtensions: Decodable {
         let hmacGetSecret: HmacGetSecretInput?
-
-        enum CodingKeys: String, CodingKey {
-            case hmacGetSecret = "hmac_get_secret"
-        }
     }
 
     struct HmacGetSecretInput: Decodable {

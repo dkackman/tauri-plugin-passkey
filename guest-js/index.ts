@@ -35,11 +35,17 @@ export type PinEvent =
         | PinEventType.PinRequired
         | PinEventType.PinAuthBlocked
         | PinEventType.PinBlocked
-        | PinEventType.UvBlocked;
+        | PinEventType.UvBlocked
+        | PinEventType.PinIsTooShort
+        | PinEventType.PinNotSet;
     }
   | {
       type: PinEventType.InvalidPin | PinEventType.InvalidUv;
       attempts_remaining?: number;
+    }
+  | {
+      type: PinEventType.PinIsTooLong;
+      max_length: number;
     };
 
 export enum PinEventType {
@@ -48,7 +54,10 @@ export enum PinEventType {
   PinAuthBlocked = 'pinAuthBlocked',
   PinBlocked = 'pinBlocked',
   InvalidUv = 'invalidUv',
-  UvBlocked = 'uvBlocked'
+  UvBlocked = 'uvBlocked',
+  PinIsTooShort = 'pinIsTooShort',
+  PinIsTooLong = 'pinIsTooLong',
+  PinNotSet = 'pinNotSet'
 }
 
 export type AuthKey = {

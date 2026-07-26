@@ -48,8 +48,9 @@ impl<R: Runtime> Authenticator<R> for Webauthn<R> {
     options: PublicKeyCredentialCreationOptions,
     timeout: u32,
   ) -> crate::Result<RegisterPublicKeyCredential> {
+    // `options.extensions` can carry PRF inputs — log identifiers only.
     #[cfg(feature = "log")]
-    log::info!("Registering with options: {options:?}");
+    log::info!("Registering for rp_id={}", options.rp.id);
     let mut manager = self.manager.lock().unwrap();
     manager
       .perform_register(self.status_tx.clone(), origin, options, timeout as u64)
@@ -67,8 +68,9 @@ impl<R: Runtime> Authenticator<R> for Webauthn<R> {
     options: PublicKeyCredentialRequestOptions,
     timeout: u32,
   ) -> crate::Result<PublicKeyCredential> {
+    // `options.extensions` carries the PRF salts — log identifiers only.
     #[cfg(feature = "log")]
-    log::debug!("Authenticating with options: {options:?}");
+    log::debug!("Authenticating for rp_id={}", options.rp_id);
     let mut manager = self.manager.lock().unwrap();
     manager
       .perform_authentication(self.status_tx.clone(), origin, options, timeout as u64)
