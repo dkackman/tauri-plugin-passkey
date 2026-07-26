@@ -19,6 +19,7 @@ pub(crate) async fn register<R: Runtime>(
   options: PublicKeyCredentialCreationOptions,
   timeout: Option<u32>,
 ) -> Result<RegisterPublicKeyCredential> {
+  crate::validation::validate_rp_id(&origin, &options.rp.id)?;
   block_in_place(|| {
     app
       .webauthn()
@@ -34,6 +35,7 @@ pub(crate) async fn authenticate<R: Runtime>(
   options: PublicKeyCredentialRequestOptions,
   timeout: Option<u32>,
 ) -> Result<PublicKeyCredential> {
+  crate::validation::validate_rp_id(&origin, &options.rp_id)?;
   block_in_place(|| {
     app
       .webauthn()

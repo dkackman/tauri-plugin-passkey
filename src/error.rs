@@ -16,6 +16,8 @@ pub enum Error {
   SerdeJson(#[from] serde_json::Error),
   #[error("No token found")]
   NoToken,
+  #[error("Validation error: {0}")]
+  Validation(String),
   #[error("Authenticator error: {0}")]
   Authenticator(String),
   #[cfg(not(any(
