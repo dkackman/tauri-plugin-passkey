@@ -206,7 +206,12 @@ fn await_swift_result(
 ) -> crate::Result<String> {
   receiver
     .recv_timeout(Duration::from_millis(timeout as u64))
-    .map_err(|e| crate::Error::Authenticator(format!("Timeout waiting for authenticator: {e}")))?
+    .map_err(|e| {
+      // The user never answered the sheet — tear it down so it does not
+      // linger after we have already reported failure to the webview.
+      unsafe { webauthn_cancel() };
+      crate::Error::Authenticator(format!("Timeout waiting for authenticator: {e}"))
+    })?
     .map_err(|e| {
       #[cfg(feature = "log")]
       log::error!("Failed to complete passkey operation: {e}");

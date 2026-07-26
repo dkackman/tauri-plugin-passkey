@@ -94,6 +94,10 @@ public final class PasskeyHandler: NSObject {
     }
 
     public func cancel() {
+        // Dismiss the system sheet. This asynchronously triggers
+        // didCompleteWithError(ASAuthorizationError.canceled), which is a
+        // no-op because the continuations are nil-ed below first.
+        activeController?.cancel()
         activeController = nil
         registrationContinuation?.resume(throwing: CancellationError())
         registrationContinuation = nil
