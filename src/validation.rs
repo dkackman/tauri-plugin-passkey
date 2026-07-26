@@ -1,5 +1,5 @@
-use tauri::Url;
 use base64urlsafedata::Base64UrlSafeData;
+use tauri::Url;
 
 /// Enforce the WebAuthn client rule that the relying party id must be the
 /// origin's effective domain or a registrable suffix of it, and that the
