@@ -10,12 +10,12 @@ jobs:
       checks: write
       contents: write
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
         with:
           token: ${{ github.event.pull_request.head.repo.full_name == github.repository && secrets.PERSONAL_TOKEN || github.token }}
       - uses: dtolnay/rust-toolchain@stable
 
-      - uses: awalsh128/cache-apt-pkgs-action@latest
+      - uses: awalsh128/cache-apt-pkgs-action@v1.6.3
         with:
           packages: libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf libudev-dev libpcsclite-dev
           version: 1.1
@@ -31,7 +31,7 @@ jobs:
           useLockFile: false
 
       - name: Run linters
-        uses: profiidev/rust-lint-action@v3
+        uses: profiidev/rust-lint-action@v4
         with:
           auto_fix: ${{ github.event.pull_request.head.repo.full_name == github.repository }}
           rustfmt: true
