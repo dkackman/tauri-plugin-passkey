@@ -11,9 +11,9 @@ use authenticator::{
   crypto::COSEAlgorithm,
   ctap2::server::{
     AuthenticationExtensionsClientInputs, AuthenticationExtensionsClientOutputs,
-    CredentialProtectionPolicy, HMACGetSecretInput, PublicKeyCredentialParameters,
-    PublicKeyCredentialUserEntity, RelyingParty, ResidentKeyRequirement,
-    UserVerificationRequirement,
+    CredentialProtectionPolicy, HMACGetSecretInput, PublicKeyCredentialDescriptor,
+    PublicKeyCredentialParameters, PublicKeyCredentialUserEntity, RelyingParty,
+    ResidentKeyRequirement, Transport, UserVerificationRequirement,
   },
   statecallback::StateCallback,
   Pin, StatusPinUv, StatusUpdate,
@@ -54,11 +54,19 @@ pub fn perform_register(
   hasher.update(&client_data);
   let client_data_hash = hasher.finish();
 
+  let user_verification_req = options
+    .authenticator_selection
+    .as_ref()
+    .map(|s| convert_user_verification(s.user_verification))
+    .unwrap_or(UserVerificationRequirement::Preferred);
+  let resident_key_req = convert_resident_key(options.authenticator_selection.as_ref());
+  let exclude_list = convert_exclude_list(options.exclude_credentials);
+
   let args = RegisterArgs {
     pin: None,
     client_data_hash,
     origin: url.to_string(),
-    user_verification_req: UserVerificationRequirement::Required,
+    user_verification_req,
     use_ctap1_fallback: false,
     relying_party: RelyingParty {
       id: options.rp.id,
@@ -69,8 +77,8 @@ pub fn perform_register(
       name: Some(options.user.name),
       display_name: Some(options.user.display_name),
     },
-    exclude_list: Vec::new(),
-    resident_key_req: ResidentKeyRequirement::Required,
+    exclude_list,
+    resident_key_req,
     extensions: convert_request_registration_extensions(options.extensions),
     pub_cred_params: convert_algorithms(options.pub_key_cred_params),
   };
@@ -141,9 +149,9 @@ pub fn perform_authentication(
     client_data_hash,
     origin: url.to_string(),
     user_presence_req: true,
-    user_verification_req: UserVerificationRequirement::Required,
+    user_verification_req: convert_user_verification(options.user_verification),
     use_ctap1_fallback: false,
-    allow_list: Vec::new(),
+    allow_list: convert_allow_list(options.allow_credentials),
     extensions: convert_request_authentication_extensions(options.extensions)?,
   };
 
@@ -336,4 +344,74 @@ fn convert_algorithms(
       })
     })
     .collect()
+}
+
+fn convert_transports(
+  transports: Vec<webauthn_rs_proto::AuthenticatorTransport>,
+) -> Vec<Transport> {
+  transports
+    .into_iter()
+    .filter_map(|t| match t {
+      webauthn_rs_proto::AuthenticatorTransport::Usb => Some(Transport::USB),
+      webauthn_rs_proto::AuthenticatorTransport::Nfc => Some(Transport::NFC),
+      webauthn_rs_proto::AuthenticatorTransport::Ble => Some(Transport::BLE),
+      webauthn_rs_proto::AuthenticatorTransport::Internal => Some(Transport::Internal),
+      _ => None, // Hybrid etc. have no CTAP2-crate equivalent
+    })
+    .collect()
+}
+
+fn convert_exclude_list(
+  list: Option<Vec<webauthn_rs_proto::PublicKeyCredentialDescriptor>>,
+) -> Vec<PublicKeyCredentialDescriptor> {
+  list
+    .unwrap_or_default()
+    .into_iter()
+    .map(|d| PublicKeyCredentialDescriptor {
+      id: d.id.into(),
+      transports: d.transports.map(convert_transports).unwrap_or_default(),
+    })
+    .collect()
+}
+
+fn convert_allow_list(
+  list: Vec<webauthn_rs_proto::AllowCredentials>,
+) -> Vec<PublicKeyCredentialDescriptor> {
+  list
+    .into_iter()
+    .map(|c| PublicKeyCredentialDescriptor {
+      id: c.id.into(),
+      transports: c.transports.map(convert_transports).unwrap_or_default(),
+    })
+    .collect()
+}
+
+fn convert_user_verification(
+  policy: webauthn_rs_proto::UserVerificationPolicy,
+) -> UserVerificationRequirement {
+  match policy {
+    webauthn_rs_proto::UserVerificationPolicy::Required => UserVerificationRequirement::Required,
+    webauthn_rs_proto::UserVerificationPolicy::Preferred => UserVerificationRequirement::Preferred,
+    webauthn_rs_proto::UserVerificationPolicy::Discouraged_DO_NOT_USE => {
+      UserVerificationRequirement::Discouraged
+    }
+  }
+}
+
+fn convert_resident_key(
+  selection: Option<&webauthn_rs_proto::AuthenticatorSelectionCriteria>,
+) -> ResidentKeyRequirement {
+  match selection.and_then(|s| s.resident_key) {
+    Some(webauthn_rs_proto::ResidentKeyRequirement::Required) => ResidentKeyRequirement::Required,
+    Some(webauthn_rs_proto::ResidentKeyRequirement::Preferred) => ResidentKeyRequirement::Preferred,
+    Some(webauthn_rs_proto::ResidentKeyRequirement::Discouraged) => {
+      ResidentKeyRequirement::Discouraged
+    }
+    // WebAuthn Level 1 compatibility: the boolean is authoritative when the
+    // enum is absent.
+    None if selection.map(|s| s.require_resident_key).unwrap_or(false) => {
+      ResidentKeyRequirement::Required
+    }
+    None => ResidentKeyRequirement::Preferred,
+  }
 }
