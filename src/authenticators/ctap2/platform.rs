@@ -112,6 +112,16 @@ pub fn perform_register(
   #[cfg(feature = "log")]
   log::debug!("Register succeeded");
 
+  let raw_id = result
+    .att_obj
+    .auth_data
+    .credential_data
+    .as_ref()
+    .map(|c| c.credential_id.clone())
+    .ok_or_else(|| {
+      crate::Error::Authenticator("attestation object is missing credential data".to_string())
+    })?;
+
   Ok(webauthn_rs_proto::RegisterPublicKeyCredential {
     extensions: convert_response_registration_extensions(result.extensions),
     response: webauthn_rs_proto::AuthenticatorAttestationResponseRaw {
@@ -124,8 +134,8 @@ pub fn perform_register(
         AuthenticatorTransport::Ble,
       ]),
     },
-    id: String::new(),
-    raw_id: Vec::new().into(),
+    id: BASE64_URL_SAFE_NO_PAD.encode(&raw_id),
+    raw_id: raw_id.into(),
     type_: "public-key".to_string(),
   })
 }
@@ -187,7 +197,7 @@ pub fn perform_authentication(
     .credentials
     .map(|c| c.id)
     .unwrap_or_default();
-  let data = serde_cbor_2::to_vec(&result.assertion.auth_data)?;
+  let auth_data = result.assertion.auth_data.to_vec();
 
   Ok(PublicKeyCredential {
     id: BASE64_URL_SAFE_NO_PAD.encode(&raw_id),
@@ -195,7 +205,7 @@ pub fn perform_authentication(
     type_: "public-key".to_string(),
     response: webauthn_rs_proto::AuthenticatorAssertionResponseRaw {
       client_data_json: Base64UrlSafeData::from(client_data),
-      authenticator_data: data[2..].into(),
+      authenticator_data: auth_data.into(),
       signature: result.assertion.signature.into(),
       user_handle: result.assertion.user.map(|h| h.id.into()),
     },
