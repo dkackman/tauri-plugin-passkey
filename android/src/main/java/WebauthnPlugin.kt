@@ -14,13 +14,16 @@ import app.tauri.plugin.Plugin
 import app.tauri.plugin.Invoke
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.CancellationException
 
 @TauriPlugin
 class WebauthnPlugin(activity: Activity): Plugin(activity) {
   private val scope = CoroutineScope(Dispatchers.Main)
   private val credentialManager = CredentialManager.create(activity)
   private val pluginActivity = activity
+  private var currentJob: Job? = null
   
   @Command
   fun register(invoke: Invoke) {
@@ -30,7 +33,7 @@ class WebauthnPlugin(activity: Activity): Plugin(activity) {
       requestJson = args,
     )
 
-    scope.launch {
+    currentJob = scope.launch {
       try {
         val result = credentialManager.createCredential(
           pluginActivity,
@@ -45,10 +48,11 @@ class WebauthnPlugin(activity: Activity): Plugin(activity) {
             invoke.reject("Invalid credential type")
           }
         }
+      } catch (e: CancellationException) {
+        invoke.reject("Operation cancelled")
+        throw e
       } catch (e: Exception) {
-        // Handle error
-        e.printStackTrace()
-        invoke.reject(e.message)
+        invoke.reject(e.message ?: e.javaClass.simpleName)
       }
     }
   }
@@ -64,7 +68,7 @@ class WebauthnPlugin(activity: Activity): Plugin(activity) {
       listOf(getPublicKeyCredentialOption),
     )
 
-    scope.launch {
+    currentJob = scope.launch {
       try {
         val result = credentialManager.getCredential(
           pluginActivity,
@@ -79,11 +83,19 @@ class WebauthnPlugin(activity: Activity): Plugin(activity) {
             invoke.reject("Invalid credential type")
           }
         }
+      } catch (e: CancellationException) {
+        invoke.reject("Operation cancelled")
+        throw e
       } catch (e: Exception) {
-        // Handle error
-        e.printStackTrace()
-        invoke.reject(e.message)
+        invoke.reject(e.message ?: e.javaClass.simpleName)
       }
     }
+  }
+
+  @Command
+  fun cancel(invoke: Invoke) {
+    currentJob?.cancel()
+    currentJob = null
+    invoke.resolve()
   }
 }
