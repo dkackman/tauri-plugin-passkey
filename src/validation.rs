@@ -1,4 +1,5 @@
 use tauri::Url;
+use base64urlsafedata::Base64UrlSafeData;
 
 /// Enforce the WebAuthn client rule that the relying party id must be the
 /// origin's effective domain or a registrable suffix of it, and that the
@@ -45,6 +46,24 @@ pub fn validate_rp_id(origin: &Url, rp_id: &str) -> crate::Result<()> {
 
 fn validation_error(msg: &str) -> crate::Error {
   crate::Error::Validation(msg.to_string())
+}
+
+/// Build the clientDataJSON bytes the way a browser would: `origin` is the
+/// ASCII serialization of the URL's origin (scheme://host[:port], no path,
+/// no trailing slash). Serializing a `Url` directly appends "/" and breaks
+/// servers that string-compare expectedOrigin.
+pub fn build_client_data(
+  type_: &str,
+  challenge: &Base64UrlSafeData,
+  origin: &Url,
+) -> crate::Result<Vec<u8>> {
+  serde_json::to_vec(&serde_json::json!({
+    "type": type_,
+    "challenge": challenge,
+    "origin": origin.origin().ascii_serialization(),
+    "crossOrigin": false,
+  }))
+  .map_err(Into::into)
 }
 
 #[cfg(test)]
@@ -100,5 +119,26 @@ mod tests {
   #[test]
   fn rejects_empty_rp_id() {
     assert!(validate_rp_id(&url("https://example.com"), "").is_err());
+  }
+
+  #[test]
+  fn client_data_origin_has_no_trailing_slash() {
+    let challenge = Base64UrlSafeData::from(vec![1u8, 2, 3]);
+    let bytes =
+      build_client_data("webauthn.create", &challenge, &url("https://example.com")).unwrap();
+    let v: serde_json::Value = serde_json::from_slice(&bytes).unwrap();
+    assert_eq!(v["origin"], "https://example.com");
+    assert_eq!(v["type"], "webauthn.create");
+    assert_eq!(v["challenge"], "AQID"); // base64url of [1,2,3], no padding
+    assert_eq!(v["crossOrigin"], false);
+  }
+
+  #[test]
+  fn client_data_origin_keeps_port() {
+    let challenge = Base64UrlSafeData::from(vec![9u8]);
+    let bytes =
+      build_client_data("webauthn.get", &challenge, &url("http://localhost:1420")).unwrap();
+    let v: serde_json::Value = serde_json::from_slice(&bytes).unwrap();
+    assert_eq!(v["origin"], "http://localhost:1420");
   }
 }

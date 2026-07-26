@@ -21,7 +21,7 @@ use openssl::sha::Sha256;
 use tauri::{async_runtime::block_on, AppHandle, Emitter, Runtime, Url};
 use tokio::sync::mpsc;
 use webauthn_rs_proto::{
-  AuthenticatorTransport, CollectedClientData, PublicKeyCredential,
+  AuthenticatorTransport, PublicKeyCredential,
   PublicKeyCredentialCreationOptions, PublicKeyCredentialRequestOptions,
   RegisterPublicKeyCredential, RegistrationExtensionsClientOutputs,
   RequestAuthenticationExtensions, RequestRegistrationExtensions,
@@ -63,14 +63,8 @@ impl AuthenticatorExt for AuthenticatorService {
     options: PublicKeyCredentialCreationOptions,
     timeout: u64,
   ) -> crate::Result<RegisterPublicKeyCredential> {
-    let client_data: Vec<u8> = serde_json::to_vec(&CollectedClientData {
-      type_: "webauthn.create".to_string(),
-      challenge: options.challenge,
-      origin: url.clone(),
-      cross_origin: None,
-      token_binding: None,
-      unknown_keys: Default::default(),
-    })?;
+    let client_data =
+      crate::validation::build_client_data("webauthn.create", &options.challenge, &url)?;
 
     let mut hasher = Sha256::new();
     hasher.update(&client_data);
@@ -144,14 +138,8 @@ impl AuthenticatorExt for AuthenticatorService {
     options: PublicKeyCredentialRequestOptions,
     timeout: u64,
   ) -> crate::Result<PublicKeyCredential> {
-    let client_data: Vec<u8> = serde_json::to_vec(&CollectedClientData {
-      type_: "webauthn.get".to_string(),
-      challenge: options.challenge,
-      origin: url.clone(),
-      cross_origin: None,
-      token_binding: None,
-      unknown_keys: Default::default(),
-    })?;
+    let client_data =
+      crate::validation::build_client_data("webauthn.get", &options.challenge, &url)?;
 
     let mut hasher = Sha256::new();
     hasher.update(&client_data);
