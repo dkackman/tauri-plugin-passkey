@@ -10,20 +10,23 @@ cd "$SCRIPT_DIR"
 TAURI_CONF="src-tauri/tauri.conf.json"
 ENTITLEMENTS="src-tauri/Entitlements.plist"
 ENTITLEMENTS_TEMPLATE="src-tauri/Entitlements.plist.example"
+IOS_ENTITLEMENTS_TEMPLATE="src-tauri/Entitlements.iOS.plist.example"
 
 # Temp files are declared up front so the trap is valid under `set -u`.
-TMP_ENTITLEMENTS=""
+RENDER_TMP=""
 TMP_CONF=""
 TMP_ENV=""
 cleanup() {
-    rm -f "$TMP_ENTITLEMENTS" "$TMP_CONF" "$TMP_ENV"
+    rm -f "$RENDER_TMP" "$TMP_CONF" "$TMP_ENV"
 }
 trap cleanup EXIT
 
-if [ ! -f "$ENTITLEMENTS_TEMPLATE" ]; then
-    echo "ERROR: Template not found at $ENTITLEMENTS_TEMPLATE"
-    exit 1
-fi
+for tmpl in "$ENTITLEMENTS_TEMPLATE" "$IOS_ENTITLEMENTS_TEMPLATE"; do
+    if [ ! -f "$tmpl" ]; then
+        echo "ERROR: Template not found at $tmpl"
+        exit 1
+    fi
+done
 
 if [ ! -f "$TAURI_CONF" ]; then
     echo "ERROR: Tauri config not found at $TAURI_CONF"
@@ -121,31 +124,57 @@ render_template() {
     printf '%s\n' "$content"
 }
 
+# Renders <template> to <destination>, but only once the result is known good.
+# Redirecting straight onto the destination would truncate it first, so any
+# failure mid-render would leave an empty entitlements file behind.
+render_plist_to() {
+    local template="$1" dest="$2"
+    RENDER_TMP="$(mktemp -t webauthn-plist)"
+    render_template "$template" > "$RENDER_TMP"
+
+    if grep -q '_PLACEHOLDER' "$RENDER_TMP"; then
+        echo "ERROR: unsubstituted placeholders remain after rendering $template:"
+        grep -n --color=never '_PLACEHOLDER' "$RENDER_TMP"
+        echo "The template may have gained a placeholder this script does not"
+        echo "know about. $dest was left unchanged."
+        exit 1
+    fi
+
+    if ! plutil -lint "$RENDER_TMP" >/dev/null 2>&1; then
+        echo "ERROR: rendered $template is not a valid plist."
+        echo "$dest was left unchanged."
+        exit 1
+    fi
+
+    mv "$RENDER_TMP" "$dest"
+    RENDER_TMP=""
+    # mktemp creates files 0600; these are ordinary build inputs, not secrets.
+    chmod 644 "$dest"
+}
+
 echo ""
 echo "Creating $ENTITLEMENTS..."
+render_plist_to "$ENTITLEMENTS_TEMPLATE" "$ENTITLEMENTS"
 
-# Render to a temp file and move it into place only once it is known good.
-# Redirecting straight onto the destination truncates it first, so any failure
-# would leave an empty Entitlements.plist behind.
-TMP_ENTITLEMENTS="$(mktemp -t webauthn-entitlements)"
-render_template "$ENTITLEMENTS_TEMPLATE" > "$TMP_ENTITLEMENTS"
+# ---------------------------------------------------------------------------
+# Generate the iOS entitlements
+#
+# `tauri ios init` regenerates gen/apple and overwrites this file with an empty
+# dict, silently dropping the associated-domains entry that passkeys require.
+# Rendering it from a template makes that recoverable: re-run this script after
+# any `ios init`.
+# ---------------------------------------------------------------------------
 
-if grep -q '_PLACEHOLDER' "$TMP_ENTITLEMENTS"; then
-    echo "ERROR: unsubstituted placeholders remain after rendering:"
-    grep -n --color=never '_PLACEHOLDER' "$TMP_ENTITLEMENTS"
-    echo "$ENTITLEMENTS_TEMPLATE may have gained a placeholder this script"
-    echo "does not know about. $ENTITLEMENTS was left unchanged."
-    exit 1
+APP_NAME=$(jq -er '.productName' "$TAURI_CONF")
+IOS_ENTITLEMENTS="src-tauri/gen/apple/${APP_NAME}_iOS/${APP_NAME}_iOS.entitlements"
+
+if [ -d "$(dirname "$IOS_ENTITLEMENTS")" ]; then
+    echo "Creating $IOS_ENTITLEMENTS..."
+    render_plist_to "$IOS_ENTITLEMENTS_TEMPLATE" "$IOS_ENTITLEMENTS"
+    IOS_ENTITLEMENTS_WRITTEN=yes
+else
+    IOS_ENTITLEMENTS_WRITTEN=no
 fi
-
-if ! plutil -lint "$TMP_ENTITLEMENTS" >/dev/null 2>&1; then
-    echo "ERROR: rendered entitlements are not a valid plist."
-    echo "$ENTITLEMENTS was left unchanged."
-    exit 1
-fi
-
-mv "$TMP_ENTITLEMENTS" "$ENTITLEMENTS"
-TMP_ENTITLEMENTS=""
 
 # ---------------------------------------------------------------------------
 # Update tauri.conf.json
@@ -165,7 +194,7 @@ TMP_CONF=""
 # Set up .env
 # ---------------------------------------------------------------------------
 
-DEFAULT_RP_HOST="tauri-plugin-webauthn-example.glitch.me"
+DEFAULT_RP_HOST="webauthn.dkackman.com"
 
 if [ ! -f ".env" ] && [ -f ".env.example" ]; then
     echo "Creating .env from .env.example..."
@@ -213,14 +242,28 @@ echo "  Team ID:    $TEAM_ID"
 echo "  Bundle ID:  $BUNDLE_ID"
 echo "  Domain:     $DOMAIN"
 echo ""
+if [ "$IOS_ENTITLEMENTS_WRITTEN" = no ]; then
+    echo "NOTE: $IOS_ENTITLEMENTS was not written because gen/apple does not"
+    echo "  exist yet. Run 'pnpm tauri ios init', then re-run this script."
+    echo ""
+fi
+
 echo "Next steps:"
-echo "  1. Register App ID '$BUNDLE_ID' with Associated Domains enabled"
+echo "  1. Register your Mac at"
+echo "     https://developer.apple.com/account/resources/devices/list"
+echo "     Apple silicon Macs must be registered with the Provisioning UDID"
+echo "     from 'system_profiler SPHardwareDataType', not the Hardware UUID."
+echo "  2. Register App ID '$BUNDLE_ID' with Associated Domains enabled"
 echo "     at https://developer.apple.com/account/resources/identifiers/list"
-echo "  2. Create a provisioning profile and save it as:"
+echo "  3. Create a provisioning profile including your Mac and your"
+echo "     development certificate, and save it as:"
 echo "     $SCRIPT_DIR/embedded.provisionprofile"
-echo "  3. Deploy your AASA file at https://$DOMAIN/.well-known/apple-app-site-association"
-echo "  4. Regenerate platform files:"
+echo "  4. Deploy your AASA file at https://$DOMAIN/.well-known/apple-app-site-association"
+echo "  5. Regenerate platform files if needed:"
 echo "     pnpm tauri ios init"
 echo "     pnpm tauri android init"
-echo "  5. Build: ./build-macos-dev.sh"
+echo "     Both overwrite generated project files. 'ios init' empties the iOS"
+echo "     entitlements, so re-run ./setup-dev.sh afterwards to restore the"
+echo "     associated-domains entry."
+echo "  6. Build: ./build-macos-dev.sh"
 echo ""

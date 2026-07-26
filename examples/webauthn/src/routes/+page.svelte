@@ -265,11 +265,11 @@
       <form onsubmit={(e) => { e.preventDefault(); saveSettings(); }}>
         <label>
           RP ID
-          <input bind:value={settingsRpId} placeholder="e.g. tauri-plugin-webauthn-example.glitch.me" />
+          <input bind:value={settingsRpId} placeholder="e.g. webauthn.dkackman.com" />
         </label>
         <label>
           RP Origin
-          <input bind:value={settingsRpOrigin} placeholder="e.g. https://tauri-plugin-webauthn-example.glitch.me" />
+          <input bind:value={settingsRpOrigin} placeholder="e.g. https://webauthn.dkackman.com" />
         </label>
         <div class="settings-actions">
           <button type="submit">Save</button>
