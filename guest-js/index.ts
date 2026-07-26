@@ -104,7 +104,7 @@ export async function authenticate(
 
 /**
  * Sends a pin to the authenticator.
- * Does nothing on windows and mobile.
+ * Only needed on Linux; PIN entry is handled natively elsewhere.
  *
  * @param pin The pin to send to the authenticator.
  * @returns A promise that resolves when the pin has been sent.
@@ -130,7 +130,7 @@ export async function selectKey(index: number): Promise<void> {
 
 /**
  * Cancels the current operation.
- * Does nothing on windows and mobile.
+ * Cancels the pending operation on Linux, macOS, iOS, and Android. Does nothing on Windows.
  *
  * @returns A promise that resolves when the operation has been cancelled.
  */
@@ -140,7 +140,7 @@ export async function cancel(): Promise<void> {
 
 /**
  * Creates a listener for the webauthn events.
- * No events are triggered on windows and mobile.
+ * Events are only emitted on Linux; other platforms show native UI instead.
  *
  * @param listener The listener to call when the event is triggered.
  * @returns A promise that resolves to a function that can be used to unregister the listener.
