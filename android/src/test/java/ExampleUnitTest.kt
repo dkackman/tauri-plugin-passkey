@@ -1,4 +1,4 @@
-package de.plugin.webauthn
+package net.kackman.webauthn
 
 import org.junit.Test
 

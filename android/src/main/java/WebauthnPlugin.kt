@@ -1,4 +1,4 @@
-package de.plugin.webauthn
+package net.kackman.webauthn
 
 import android.app.Activity
 import androidx.credentials.CreatePublicKeyCredentialRequest

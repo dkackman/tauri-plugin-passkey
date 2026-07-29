@@ -4,7 +4,7 @@ plugins {
 }
 
 android {
-    namespace = "de.plugin.webauthn"
+    namespace = "net.kackman.webauthn"
     compileSdk = 34
 
     defaultConfig {
