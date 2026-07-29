@@ -16,7 +16,7 @@
     "@tauri-apps/api": "^2.11.1",
     "@tauri-apps/plugin-log": "^2.9.0",
     "@tauri-apps/plugin-opener": "^2.5.4",
-    "tauri-plugin-webauthn-api": "file:../.."
+    "tauri-plugin-webauthn-api": "file:../tauri-plugin-webauthn"
   },
   "devDependencies": {
     "@sveltejs/adapter-static": "^3.0.10",

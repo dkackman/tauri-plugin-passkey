@@ -1,7 +1,4 @@
 {
-  "workspaces": [
-    "test-app"
-  ],
   "name": "tauri-plugin-webauthn-api",
   "version": "0.2.0",
   "author": "Don Kackman",

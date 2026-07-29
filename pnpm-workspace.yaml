@@ -1,0 +1,6 @@
+packages:
+  - tauri-plugin-webauthn
+  - test-app
+
+onlyBuiltDependencies:
+  - esbuild
