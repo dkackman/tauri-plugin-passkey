@@ -28,6 +28,14 @@ SE lives at `/Users/don/src/dkackman/tauri-plugin-secure-element`. Unless a task
 
 **Do NOT rename** Tauri ABI symbols: `init_plugin_webauthn`, `webauthn_register`, `webauthn_authenticate`, `webauthn_free_string`, `webauthn_cancel`.
 
+## Execution order (reordered per pre-flight scan)
+
+Task numbers below are stable identifiers; **execute in this sequence** so each
+phase's "confirm CI green" check can actually hold (config + lint land before the
+CI rebuild that invokes them):
+
+`0.1 → 0.2 → 0.3 → 1.1 → 1.2 → 1.3 → 1.4 → 3.3 → 3.4 → 2.1 → 2.2 → 2.3 → 2.4 → 3.1 → 3.2 → 3.5 → 4.1 → 4.2 → 4.3 → 4.4`
+
 ## Global Constraints
 
 - **License:** `MIT OR Apache-2.0` in every `Cargo.toml` and `package.json` `license` field. Retain ProfiiDev + fendent MIT attribution; add Don Kackman.
