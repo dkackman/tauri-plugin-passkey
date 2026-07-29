@@ -67,7 +67,7 @@ iOS support uses Apple's ASAuthorization framework. It requires iOS 15+ (PRF ext
 
 The `register` and `authenticate` methods can be used nearly identically to the `@simplewebauthn/browser`. The biggest difference is the `sendPin` method and the event handler
 which is only required on Linux (Windows and Android handle the pin natively which means no events will be sent on those platforms and the pin method does nothing).
-An example can be found in the `examples/webauthn` directory. It works on all supported platforms. On Linux, non-discoverable credentials require the server's allowCredentials list to be passed through unmodified, and the origin string must exactly match the server's expectedOrigin (no trailing slash).
+An example can be found in the `test-app` directory. It works on all supported platforms. On Linux, non-discoverable credentials require the server's allowCredentials list to be passed through unmodified, and the origin string must exactly match the server's expectedOrigin (no trailing slash).
 
 ## Credential Discovery
 

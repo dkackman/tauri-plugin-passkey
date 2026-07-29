@@ -22,7 +22,7 @@ pnpm build
 Each developer needs their own Apple Team ID, bundle identifier, and associated domain. Run the setup script to configure these:
 
 ```bash
-cd examples/webauthn
+cd test-app
 ./setup-dev.sh
 ```
 
@@ -134,10 +134,10 @@ Enable Associated Domains developer mode (one-time):
 sudo swcutil developer-mode -e true
 ```
 
-Place your provisioning profile at `examples/webauthn/embedded.provisionprofile`, then build and sign:
+Place your provisioning profile at `test-app/embedded.provisionprofile`, then build and sign:
 
 ```bash
-cd examples/webauthn
+cd test-app
 ./build-macos-dev.sh
 ```
 

@@ -7,7 +7,7 @@
 #    at https://developer.apple.com/account/resources/identifiers/list
 # 3. Create a Mac Development provisioning profile at:
 #    https://developer.apple.com/account/resources/profiles/list
-# 4. Place the downloaded profile as: examples/webauthn/embedded.provisionprofile
+# 4. Place the downloaded profile as: test-app/embedded.provisionprofile
 # 5. Deploy apple-app-site-association on the associated domain (see Entitlements.plist)
 #
 # Run this script from anywhere; it operates on its own directory.
