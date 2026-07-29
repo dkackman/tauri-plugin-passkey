@@ -4,13 +4,13 @@
   ],
   "name": "tauri-plugin-webauthn-api",
   "version": "0.2.0",
-  "author": "profidev",
+  "author": "Don Kackman",
   "description": "A Tauri plugin for WebAuthn API",
   "repository": {
     "type": "git",
-    "url": "https://github.com/Profiidev/tauri-plugin-webauthn"
+    "url": "https://github.com/dkackman/tauri-plugin-webauthn"
   },
-  "license": "MIT",
+  "license": "MIT OR Apache-2.0",
   "type": "module",
   "types": "./dist-js/index.d.ts",
   "main": "./dist-js/index.cjs",
