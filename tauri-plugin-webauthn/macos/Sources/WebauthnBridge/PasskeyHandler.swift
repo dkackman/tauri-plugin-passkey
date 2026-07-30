@@ -1,6 +1,6 @@
-import Foundation
-import AuthenticationServices
 import AppKit
+import AuthenticationServices
+import Foundation
 
 @MainActor
 public final class PasskeyHandler: NSObject {
@@ -41,7 +41,7 @@ public final class PasskeyHandler: NSObject {
             userID: userID
         )
         securityKeyRequest.credentialParameters = [
-            ASAuthorizationPublicKeyCredentialParameters(algorithm: .ES256)
+            ASAuthorizationPublicKeyCredentialParameters(algorithm: .ES256),
         ]
         if !excludeCredentials.isEmpty {
             securityKeyRequest.excludedCredentials = excludeCredentials.map {
@@ -123,26 +123,28 @@ public final class PasskeyHandler: NSObject {
 }
 
 extension PasskeyHandler: ASAuthorizationControllerDelegate, ASAuthorizationControllerPresentationContextProviding {
-    public func presentationAnchor(for controller: ASAuthorizationController) -> ASPresentationAnchor {
-        return NSApplication.shared.windows.first ?? NSWindow()
+    public func presentationAnchor(for _: ASAuthorizationController) -> ASPresentationAnchor {
+        NSApplication.shared.windows.first ?? NSWindow()
     }
 
     public func authorizationController(
-        controller: ASAuthorizationController, didCompleteWithAuthorization auth: ASAuthorization
+        controller _: ASAuthorizationController, didCompleteWithAuthorization auth: ASAuthorization
     ) {
         activeController = nil
         if auth.credential is ASAuthorizationPlatformPublicKeyCredentialRegistration
-            || auth.credential is ASAuthorizationSecurityKeyPublicKeyCredentialRegistration {
+            || auth.credential is ASAuthorizationSecurityKeyPublicKeyCredentialRegistration
+        {
             registrationContinuation?.resume(returning: auth)
             registrationContinuation = nil
         } else if auth.credential is ASAuthorizationPlatformPublicKeyCredentialAssertion
-            || auth.credential is ASAuthorizationSecurityKeyPublicKeyCredentialAssertion {
+            || auth.credential is ASAuthorizationSecurityKeyPublicKeyCredentialAssertion
+        {
             assertionContinuation?.resume(returning: auth)
             assertionContinuation = nil
         }
     }
 
-    public func authorizationController(controller: ASAuthorizationController, didCompleteWithError error: Error) {
+    public func authorizationController(controller _: ASAuthorizationController, didCompleteWithError error: Error) {
         activeController = nil
         registrationContinuation?.resume(throwing: error)
         registrationContinuation = nil

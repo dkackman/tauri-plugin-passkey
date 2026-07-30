@@ -1,10 +1,10 @@
-import Foundation
 import AuthenticationServices
 import CryptoKit
+import Foundation
 
 // MARK: - Active handler storage
 
-// Module-level storage for the active handler, accessed on the main actor.
+/// Module-level storage for the active handler, accessed on the main actor.
 @MainActor
 private var activePasskeyHandler: PasskeyHandler?
 
@@ -13,9 +13,9 @@ private var activePasskeyHandler: PasskeyHandler?
 /// Callback type: receives a JSON C-string (or null on failure) and a context pointer.
 /// The Rust side owns the C-string and must free it with `webauthn_free_string`.
 public typealias WebauthnCallback = @Sendable @convention(c) (
-    UnsafePointer<CChar>?,   // json result (null = error)
-    UnsafePointer<CChar>?,   // error message (null = success)
-    UInt64                    // context
+    UnsafePointer<CChar>?, // json result (null = error)
+    UnsafePointer<CChar>?, // error message (null = success)
+    UInt64 // context
 ) -> Void
 
 @_cdecl("webauthn_register")
@@ -43,7 +43,8 @@ public func webauthnRegister(
     if let jsonPtr = excludeCredentialsJson {
         let jsonStr = String(cString: jsonPtr)
         if let jsonData = jsonStr.data(using: .utf8),
-           let arr = try? JSONSerialization.jsonObject(with: jsonData) as? [String] {
+           let arr = try? JSONSerialization.jsonObject(with: jsonData) as? [String]
+        {
             excludedCredentials = arr.compactMap { base64URLDecode($0) }
         }
     }
@@ -91,7 +92,8 @@ public func webauthnAuthenticate(
     if let jsonPtr = allowCredentialsJson {
         let jsonStr = String(cString: jsonPtr)
         if let jsonData = jsonStr.data(using: .utf8),
-           let arr = try? JSONSerialization.jsonObject(with: jsonData) as? [String] {
+           let arr = try? JSONSerialization.jsonObject(with: jsonData) as? [String]
+        {
             allowedCredentials = arr.compactMap { base64URLDecode($0) }
         }
     }
@@ -160,14 +162,15 @@ private func registrationJSON(from auth: ASAuthorization) throws -> [String: Any
         "type": "public-key",
         "response": [
             "attestationObject": attestationObject.base64URLEncodedString(),
-            "clientDataJSON": reg.rawClientDataJSON.base64URLEncodedString()
-        ]
+            "clientDataJSON": reg.rawClientDataJSON.base64URLEncodedString(),
+        ],
     ]
 
     // Extract PRF registration result (macOS 15+)
     if #available(macOS 15.0, *) {
         if let platformReg = reg as? ASAuthorizationPlatformPublicKeyCredentialRegistration,
-           let prfResult = platformReg.prf {
+           let prfResult = platformReg.prf
+        {
             json["prf"] = ["enabled": prfResult.isSupported]
         }
     }
@@ -182,7 +185,7 @@ private func assertionJSON(from auth: ASAuthorization) throws -> [String: Any] {
     var response: [String: Any] = [
         "authenticatorData": assertion.rawAuthenticatorData.base64URLEncodedString(),
         "clientDataJSON": assertion.rawClientDataJSON.base64URLEncodedString(),
-        "signature": assertion.signature.base64URLEncodedString()
+        "signature": assertion.signature.base64URLEncodedString(),
     ]
     if !assertion.userID.isEmpty {
         response["userHandle"] = assertion.userID.base64URLEncodedString()
@@ -191,16 +194,17 @@ private func assertionJSON(from auth: ASAuthorization) throws -> [String: Any] {
         "id": assertion.credentialID.base64URLEncodedString(),
         "rawId": assertion.credentialID.base64URLEncodedString(),
         "type": "public-key",
-        "response": response
+        "response": response,
     ]
 
     // Extract PRF assertion result (macOS 15+)
     if #available(macOS 15.0, *) {
         if let platformAssertion = assertion as? ASAuthorizationPlatformPublicKeyCredentialAssertion,
-           let prfResult = platformAssertion.prf {
+           let prfResult = platformAssertion.prf
+        {
             let firstData = prfResult.first.withUnsafeBytes { Data($0) }
             var prfDict: [String: Any] = [
-                "first": firstData.base64URLEncodedString()
+                "first": firstData.base64URLEncodedString(),
             ]
             if let second = prfResult.second {
                 let secondData = second.withUnsafeBytes { Data($0) }
@@ -217,7 +221,8 @@ private func assertionJSON(from auth: ASAuthorization) throws -> [String: Any] {
 
 private func callbackWithJSON(_ json: [String: Any], context: UInt64, callback: WebauthnCallback) {
     guard let jsonData = try? JSONSerialization.data(withJSONObject: json),
-          let jsonStr = String(data: jsonData, encoding: .utf8) else {
+          let jsonStr = String(data: jsonData, encoding: .utf8)
+    else {
         callbackWithError(
             NSError(
                 domain: "WebauthnBridge", code: -1,
@@ -241,7 +246,7 @@ private func callbackWithError(_ error: Error, context: UInt64, callback: Webaut
 
 extension Data {
     func base64URLEncodedString() -> String {
-        return self.base64EncodedString()
+        base64EncodedString()
             .replacingOccurrences(of: "+", with: "-")
             .replacingOccurrences(of: "/", with: "_")
             .replacingOccurrences(of: "=", with: "")

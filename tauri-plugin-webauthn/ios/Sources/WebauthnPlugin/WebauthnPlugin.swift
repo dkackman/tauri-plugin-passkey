@@ -1,5 +1,5 @@
-import Foundation
 import AuthenticationServices
+import Foundation
 import Tauri
 import UIKit
 
@@ -26,8 +26,8 @@ private struct RegistrationOptions: Decodable {
         let id: String
     }
 
-    // webauthn-rs-proto serializes RequestRegistrationExtensions with
-    // #[serde(rename_all = "camelCase")], so the wire key is `hmacCreateSecret`.
+    /// webauthn-rs-proto serializes RequestRegistrationExtensions with
+    /// #[serde(rename_all = "camelCase")], so the wire key is `hmacCreateSecret`.
     struct RegistrationExtensions: Decodable {
         let hmacCreateSecret: Bool?
     }
@@ -43,13 +43,13 @@ private struct AuthenticationOptions: Decodable {
         let id: String
     }
 
-    // See RegistrationExtensions: the wire key is `hmacGetSecret`.
+    /// See RegistrationExtensions: the wire key is `hmacGetSecret`.
     struct AuthenticationExtensions: Decodable {
         let hmacGetSecret: HmacGetSecretInput?
     }
 
     struct HmacGetSecretInput: Decodable {
-        let output1: String  // base64url-encoded salt
+        let output1: String // base64url-encoded salt
         let output2: String? // optional second salt
     }
 }
@@ -170,5 +170,5 @@ class WebauthnPlugin: Plugin {
 
 @_cdecl("init_plugin_webauthn")
 func initPlugin() -> Plugin {
-    return WebauthnPlugin()
+    WebauthnPlugin()
 }

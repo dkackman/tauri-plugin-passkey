@@ -2,12 +2,12 @@ import {
   PublicKeyCredentialCreationOptionsJSON,
   PublicKeyCredentialJSON,
   PublicKeyCredentialRequestOptionsJSON,
-  RegistrationResponseJSON
-} from '@simplewebauthn/types';
-import { invoke } from '@tauri-apps/api/core';
-import { listen, UnlistenFn } from '@tauri-apps/api/event';
+  RegistrationResponseJSON,
+} from "@simplewebauthn/types";
+import { invoke } from "@tauri-apps/api/core";
+import { listen, UnlistenFn } from "@tauri-apps/api/event";
 
-export * as types from '@simplewebauthn/types';
+export * as types from "@simplewebauthn/types";
 
 export type WebauthnEvent =
   | {
@@ -23,10 +23,10 @@ export type WebauthnEvent =
     };
 
 export enum WebauthnEventType {
-  SelectDevice = 'selectDevice',
-  PresenceRequired = 'presenceRequired',
-  PinEvent = 'pinEvent',
-  SelectKey = 'selectKey'
+  SelectDevice = "selectDevice",
+  PresenceRequired = "presenceRequired",
+  PinEvent = "pinEvent",
+  SelectKey = "selectKey",
 }
 
 export type PinEvent =
@@ -49,15 +49,15 @@ export type PinEvent =
     };
 
 export enum PinEventType {
-  PinRequired = 'pinRequired',
-  InvalidPin = 'invalidPin',
-  PinAuthBlocked = 'pinAuthBlocked',
-  PinBlocked = 'pinBlocked',
-  InvalidUv = 'invalidUv',
-  UvBlocked = 'uvBlocked',
-  PinIsTooShort = 'pinIsTooShort',
-  PinIsTooLong = 'pinIsTooLong',
-  PinNotSet = 'pinNotSet'
+  PinRequired = "pinRequired",
+  InvalidPin = "invalidPin",
+  PinAuthBlocked = "pinAuthBlocked",
+  PinBlocked = "pinBlocked",
+  InvalidUv = "invalidUv",
+  UvBlocked = "uvBlocked",
+  PinIsTooShort = "pinIsTooShort",
+  PinIsTooLong = "pinIsTooLong",
+  PinNotSet = "pinNotSet",
 }
 
 export type AuthKey = {
@@ -66,7 +66,7 @@ export type AuthKey = {
   displayName?: string;
 };
 
-export const EVENT_NAME = 'tauri-plugin-webauthn';
+export const EVENT_NAME = "tauri-plugin-webauthn";
 
 /**
  * Tries to register using the native WebAuthn API.
@@ -79,9 +79,9 @@ export async function register(
   origin: string,
   options: PublicKeyCredentialCreationOptionsJSON
 ): Promise<RegistrationResponseJSON> {
-  return await invoke<RegistrationResponseJSON>('plugin:webauthn|register', {
+  return await invoke<RegistrationResponseJSON>("plugin:webauthn|register", {
     origin,
-    options
+    options,
   });
 }
 
@@ -96,9 +96,9 @@ export async function authenticate(
   origin: string,
   options: PublicKeyCredentialRequestOptionsJSON
 ): Promise<PublicKeyCredentialJSON> {
-  return await invoke<PublicKeyCredentialJSON>('plugin:webauthn|authenticate', {
+  return await invoke<PublicKeyCredentialJSON>("plugin:webauthn|authenticate", {
     origin,
-    options
+    options,
   });
 }
 
@@ -110,8 +110,8 @@ export async function authenticate(
  * @returns A promise that resolves when the pin has been sent.
  */
 export async function sendPin(pin: string): Promise<void> {
-  return await invoke('plugin:webauthn|send_pin', {
-    pin
+  return await invoke("plugin:webauthn|send_pin", {
+    pin,
   });
 }
 
@@ -123,8 +123,8 @@ export async function sendPin(pin: string): Promise<void> {
  * @returns A promise that resolves when the uv has been sent.
  */
 export async function selectKey(index: number): Promise<void> {
-  return await invoke('plugin:webauthn|select_key', {
-    key: index
+  return await invoke("plugin:webauthn|select_key", {
+    key: index,
   });
 }
 
@@ -135,7 +135,7 @@ export async function selectKey(index: number): Promise<void> {
  * @returns A promise that resolves when the operation has been cancelled.
  */
 export async function cancel(): Promise<void> {
-  return await invoke('plugin:webauthn|cancel');
+  return await invoke("plugin:webauthn|cancel");
 }
 
 /**

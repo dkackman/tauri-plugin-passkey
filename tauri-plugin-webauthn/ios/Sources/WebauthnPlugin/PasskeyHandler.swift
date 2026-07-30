@@ -1,5 +1,5 @@
-import Foundation
 import AuthenticationServices
+import Foundation
 import UIKit
 
 @available(iOS 15.0, *)
@@ -42,7 +42,7 @@ final class PasskeyHandler: NSObject {
             userID: userID
         )
         securityKeyRequest.credentialParameters = [
-            ASAuthorizationPublicKeyCredentialParameters(algorithm: .ES256)
+            ASAuthorizationPublicKeyCredentialParameters(algorithm: .ES256),
         ]
         if !excludeCredentials.isEmpty {
             securityKeyRequest.excludedCredentials = excludeCredentials.map {
@@ -127,7 +127,7 @@ final class PasskeyHandler: NSObject {
 
 @available(iOS 15.0, *)
 extension PasskeyHandler: ASAuthorizationControllerDelegate, ASAuthorizationControllerPresentationContextProviding {
-    func presentationAnchor(for controller: ASAuthorizationController) -> ASPresentationAnchor {
+    func presentationAnchor(for _: ASAuthorizationController) -> ASPresentationAnchor {
         let scene = UIApplication.shared.connectedScenes
             .compactMap { $0 as? UIWindowScene }
             .first { $0.activationState == .foregroundActive }
@@ -137,21 +137,23 @@ extension PasskeyHandler: ASAuthorizationControllerDelegate, ASAuthorizationCont
     }
 
     func authorizationController(
-        controller: ASAuthorizationController, didCompleteWithAuthorization auth: ASAuthorization
+        controller _: ASAuthorizationController, didCompleteWithAuthorization auth: ASAuthorization
     ) {
         activeController = nil
         if auth.credential is ASAuthorizationPlatformPublicKeyCredentialRegistration
-            || auth.credential is ASAuthorizationSecurityKeyPublicKeyCredentialRegistration {
+            || auth.credential is ASAuthorizationSecurityKeyPublicKeyCredentialRegistration
+        {
             registrationContinuation?.resume(returning: auth)
             registrationContinuation = nil
         } else if auth.credential is ASAuthorizationPlatformPublicKeyCredentialAssertion
-            || auth.credential is ASAuthorizationSecurityKeyPublicKeyCredentialAssertion {
+            || auth.credential is ASAuthorizationSecurityKeyPublicKeyCredentialAssertion
+        {
             assertionContinuation?.resume(returning: auth)
             assertionContinuation = nil
         }
     }
 
-    func authorizationController(controller: ASAuthorizationController, didCompleteWithError error: Error) {
+    func authorizationController(controller _: ASAuthorizationController, didCompleteWithError error: Error) {
         activeController = nil
         registrationContinuation?.resume(throwing: error)
         registrationContinuation = nil
@@ -188,14 +190,15 @@ func registrationJSON(from auth: ASAuthorization) throws -> [String: Any] {
         "type": "public-key",
         "response": [
             "attestationObject": attestationObject.base64URLEncodedString(),
-            "clientDataJSON": reg.rawClientDataJSON.base64URLEncodedString()
-        ]
+            "clientDataJSON": reg.rawClientDataJSON.base64URLEncodedString(),
+        ],
     ]
 
     // Extract PRF registration result (iOS 18+)
     if #available(iOS 18.0, *) {
         if let platformReg = reg as? ASAuthorizationPlatformPublicKeyCredentialRegistration,
-           let prfResult = platformReg.prf {
+           let prfResult = platformReg.prf
+        {
             json["prf"] = ["enabled": prfResult.isSupported]
         }
     }
@@ -211,7 +214,7 @@ func assertionJSON(from auth: ASAuthorization) throws -> [String: Any] {
     var response: [String: Any] = [
         "authenticatorData": assertion.rawAuthenticatorData.base64URLEncodedString(),
         "clientDataJSON": assertion.rawClientDataJSON.base64URLEncodedString(),
-        "signature": assertion.signature.base64URLEncodedString()
+        "signature": assertion.signature.base64URLEncodedString(),
     ]
     if !assertion.userID.isEmpty {
         response["userHandle"] = assertion.userID.base64URLEncodedString()
@@ -220,16 +223,17 @@ func assertionJSON(from auth: ASAuthorization) throws -> [String: Any] {
         "id": assertion.credentialID.base64URLEncodedString(),
         "rawId": assertion.credentialID.base64URLEncodedString(),
         "type": "public-key",
-        "response": response
+        "response": response,
     ]
 
     // Extract PRF assertion result (iOS 18+)
     if #available(iOS 18.0, *) {
         if let platformAssertion = assertion as? ASAuthorizationPlatformPublicKeyCredentialAssertion,
-           let prfResult = platformAssertion.prf {
+           let prfResult = platformAssertion.prf
+        {
             let firstData = prfResult.first.withUnsafeBytes { Data($0) }
             var prfDict: [String: Any] = [
-                "first": firstData.base64URLEncodedString()
+                "first": firstData.base64URLEncodedString(),
             ]
             if let second = prfResult.second {
                 let secondData = second.withUnsafeBytes { Data($0) }
@@ -246,7 +250,7 @@ func assertionJSON(from auth: ASAuthorization) throws -> [String: Any] {
 
 extension Data {
     func base64URLEncodedString() -> String {
-        return self.base64EncodedString()
+        base64EncodedString()
             .replacingOccurrences(of: "+", with: "-")
             .replacingOccurrences(of: "/", with: "_")
             .replacingOccurrences(of: "=", with: "")
