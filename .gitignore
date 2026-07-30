@@ -10,7 +10,6 @@ yarn.lock
 
 /.tauri
 /target
-Cargo.lock
 node_modules/
 
 dist-js
@@ -27,7 +26,7 @@ devenv.local.nix
 # Swift
 macos/.build/
 ios/.build/
-examples/webauthn/embedded.provisionprofile
+test-app/embedded.provisionprofile
 
 *.provisionprofile
 *.mobileprovision

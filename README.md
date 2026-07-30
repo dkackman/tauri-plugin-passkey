@@ -1,74 +1,123 @@
-# Tauri Plugin Webauthn
+# Tauri Plugin WebAuthn
 
-A tauri plugin to interact with the system specific fido2 or webauthn api.
-It is a nearly drop-in replacement for the `@simplewebauthn/browser` package with the only additional requirement being the origin url to pass to the register and authenticate methods.
+A Tauri plugin providing WebAuthn/FIDO2/passkey authentication for Linux, Windows,
+macOS, iOS, and Android — a near drop-in replacement for `@simplewebauthn/browser`
+where the app also passes an origin URL to the register and authenticate calls.
 
-| Platform | Supported |
-| -------- | --------- |
-| Linux    | ✓         |
-| Windows  | ✓         |
-| macOS    | ✓         |
-| Android  | ✓         |
-| iOS      | ✓         |
+[![npm](https://img.shields.io/npm/v/tauri-plugin-passkey-api)](https://www.npmjs.com/package/tauri-plugin-passkey-api)
+[![Crates.io Downloads (latest version)](https://img.shields.io/crates/dv/tauri-plugin-passkey)](https://crates.io/crates/tauri-plugin-passkey)
 
-## Requirements
+> **Using the plugin in your app?** The consumer documentation — installation, API
+> reference, and per-platform setup — lives in
+> **[`tauri-plugin-webauthn/README.md`](tauri-plugin-webauthn/README.md)**, which is
+> also what renders on
+> [npm](https://www.npmjs.com/package/tauri-plugin-passkey-api) and
+> [crates.io](https://crates.io/crates/tauri-plugin-passkey). This file covers working
+> on the repository itself.
 
-### macOS
+## Repository layout
 
-macOS support uses Apple's ASAuthorization framework for native passkey and security key authentication. It requires macOS 13+, code signing with Associated Domains entitlements, and a provisioning profile.
+A pnpm workspace monorepo:
 
-See [macos/README.md](macos/README.md) for setup instructions.
+| Path                                               | What it is                                                               |
+| -------------------------------------------------- | ------------------------------------------------------------------------ |
+| [`tauri-plugin-webauthn/`](tauri-plugin-webauthn/) | The plugin — Rust core, Swift (iOS/macOS), Kotlin (Android), TS bindings |
+| [`test-app/`](test-app/)                           | A Tauri (SvelteKit) app exercising the plugin on each platform           |
 
-### Android
+The directory, the crate's historical name, and the iOS Swift package are all named
+`webauthn`. The published crate/npm package and the runtime Tauri plugin identity are
+`passkey` (crate `tauri-plugin-passkey`, npm `tauri-plugin-passkey-api`, invoked from JS
+as `plugin:passkey|<command>`). See [`CLAUDE.md`](CLAUDE.md) for the full naming
+rationale and architecture notes.
 
-- Android API 28+ (you need to set this in your project in `src-tauri/gen/android/app/build.gradle.kts`):
-  ```
-  ...
-  android {
-    ...
-    defaultConfig {
-      ...
-      minSdk = 28
-      ...
-    }
-    ...
-  }
-  ...
-  ```
-- A `keystore.properties` file in the `src-tauri/gen/android` directory. This is required to sign the app. The documentation for this file can be found [here](https://tauri.app/distribute/sign/android/)
-- Additionally you need to define a `assetslink.json` and this needs to be hosted under a domain you own. This is required to verify the app with the webauthn api. The documentation for this file can be found [here](https://developer.android.com/identity/sign-in/credential-manager#add-support-dal) and the file can be generated [here](https://developers.google.com/digital-asset-links/tools/generator). This also needs to be included in you app manifest file at `src-tauri/gen/android/app/src/main/AndroidManifest.xml`:
-  ```xml
-  ...
-  <application>
-    ...
-    <meta-data android:name="asset_statements" android:resource="@string/asset_statements" />
-    ...
-  </application>
-  ...
-  ```
-  and the string resource needs to be defined in `src-tauri/gen/android/app/src/main/res/values/strings.xml`:
-  ```xml
-  <resources>
-    ...
-    <string name="asset_statements" translatable="false">
-    [{
-    \"include\": \"https://your.domain.com/.well-known/assetlinks.json\"
-    }]
-    </string>
-    ...
-  </resources>
-  ```
+## Prerequisites
 
-### iOS
+- [Rust](https://www.rust-lang.org/) (latest stable)
+- [Node.js](https://nodejs.org/) and [pnpm](https://pnpm.io/)
+- [Tauri system dependencies](https://v2.tauri.app/start/prerequisites/)
 
-iOS support uses Apple's ASAuthorization framework. It requires iOS 15+ (PRF extension: iOS 18+), code signing with Associated Domains entitlements (`webcredentials:your.domain.com`), and an `apple-app-site-association` file hosted on the relying party domain.
+Per platform:
 
-# Usage
+- **Linux** — no extra setup; uses a CTAP2 authenticator client directly
+- **iOS / macOS** — Xcode; swiftformat and swiftlint for the lint tasks. macOS also
+  needs a provisioning profile with Associated Domains entitlements — see
+  [`tauri-plugin-webauthn/macos/README.md`](tauri-plugin-webauthn/macos/README.md)
+- **Android** — Android Studio and the Android SDK. Do **not** install ktlint
+  yourself: the lint scripts run `pnpm exec ktlint`, which resolves a pinned version
+  that `android/build.gradle.kts` also pins for the Gradle ktlint plugin. A `ktlint` on
+  `PATH` from Homebrew or `~/.ktlint` is a different version that will disagree with CI.
+- **Windows** — Visual Studio Build Tools and the Windows SDK, for Windows Hello/CTAP2
 
-The `register` and `authenticate` methods can be used nearly identically to the `@simplewebauthn/browser`. The biggest difference is the `sendPin` method and the event handler
-which is only required on Linux (Windows and Android handle the pin natively which means no events will be sent on those platforms and the pin method does nothing).
-An example can be found in the `examples/webauthn` directory. It works on all supported platforms. On Linux, non-discoverable credentials require the server's allowCredentials list to be passed through unmodified, and the origin string must exactly match the server's expectedOrigin (no trailing slash).
+## Build
 
-## Credential Discovery
+```bash
+pnpm install
+pnpm build
+```
 
-This plugin supports credential discovery but not all underlying libraries do. Currently it works on all platforms except Windows.
+Build order matters: the plugin's TypeScript bindings (`dist-js/`) must exist before
+the test app builds. `pnpm build` from the root handles this in dependency order.
+
+### `.tauri/tauri-api` must be materialized before mobile work
+
+`tauri-plugin-webauthn/android/.tauri/tauri-api` (and the iOS equivalent) are gitignored
+copies of the Tauri mobile runtime that the Tauri CLI normally drops in place while
+building an app for a mobile target. Nothing in this repo creates them on a fresh
+checkout, so Gradle tasks and Xcode builds/tests fail until you run:
+
+```bash
+tauri-plugin-webauthn/scripts/materialize-tauri-android.sh
+tauri-plugin-webauthn/scripts/materialize-tauri-ios.sh
+```
+
+Do this before `./gradlew` anything in `tauri-plugin-webauthn/android`, or any
+`xcodebuild`/`pnpm tauri ios` work.
+
+## Running the test app
+
+```bash
+cd test-app
+
+pnpm tauri ios dev        # iOS
+pnpm tauri android dev    # Android
+pnpm tauri dev            # Windows/Linux
+```
+
+**macOS** needs a signed `.app` bundle with the right entitlements — `pnpm tauri dev`
+runs the raw binary, which ASAuthorizationController will refuse. Use:
+
+```bash
+cd test-app
+./build-macos-dev.sh
+open src-tauri/target/debug/bundle/macos/test-app.app
+```
+
+## Before committing
+
+```bash
+pnpm format   # Format all code
+pnpm lint     # Rust, Swift, Kotlin and JS lints
+pnpm build    # Everything builds
+```
+
+Rust tests run with `pnpm test:rust` (on macOS, `tauri-plugin-webauthn/scripts/test-macos.sh`
+sets up the right toolchain); Android with `pnpm test:android` (after the `.tauri`
+materialization step above); iOS with `pnpm test:swift`.
+
+## Security
+
+To report a vulnerability, see [SECURITY.md](SECURITY.md).
+
+## License
+
+MIT OR Apache-2.0
+
+## Contributing
+
+Contributions are welcome! Please feel free to submit a Pull Request.
+
+## Links
+
+- [Plugin documentation](tauri-plugin-webauthn/README.md)
+- [Repository](https://github.com/dkackman/tauri-plugin-webauthn)
+- [Issues](https://github.com/dkackman/tauri-plugin-webauthn/issues)

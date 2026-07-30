@@ -1,0 +1,10 @@
+tauri-plugin-webauthn
+Copyright 2026 Don Kackman
+
+This product is a derivative of tauri-plugin-webauthn by ProfiiDev
+(https://github.com/Profiidev/tauri-plugin-webauthn), originally forked from
+fendent (https://github.com/fendent/tauri-plugin-webauthn), used under the MIT
+License. Original MIT copyright notices are retained in LICENSE-MIT.
+
+Licensed under either of Apache License, Version 2.0 (LICENSE-APACHE) or
+MIT License (LICENSE-MIT) at your option.
