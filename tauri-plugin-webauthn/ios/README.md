@@ -15,7 +15,7 @@ Tauri App (Rust)
 
 The Rust side calls `run_mobile_plugin("register", ...)` / `run_mobile_plugin("authenticate", ...)` with JSON-serialized WebAuthn options. The Swift plugin decodes the JSON, runs the ASAuthorization flow on the main thread, serializes the credential response back to JSON, and resolves the Tauri invoke. The Rust side deserializes the JSON into `webauthn-rs-proto` types.
 
-Unlike the macOS bridge (which uses C-callable FFI via `swift-rs`), the iOS bridge uses Tauri's native mobile plugin system. The Swift code extends Tauri's `Plugin` class and is registered via the `@_cdecl("init_plugin_webauthn")` entry point.
+Unlike the macOS bridge (which uses C-callable FFI via `swift-rs`), the iOS bridge uses Tauri's native mobile plugin system. The Swift code extends Tauri's `Plugin` class and is registered via the `@_cdecl("init_plugin_passkey")` entry point.
 
 ## Consuming App Setup
 
@@ -46,7 +46,7 @@ In `src-tauri/capabilities/default.json`, add the webauthn permission:
 
 ```json
 {
-  "permissions": ["webauthn:default"]
+  "permissions": ["passkey:default"]
 }
 ```
 

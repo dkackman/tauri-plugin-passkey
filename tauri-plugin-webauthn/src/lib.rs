@@ -38,7 +38,7 @@ impl<R: Runtime, T: Manager<R>> crate::WebauthnExt<R> for T {
 
 /// Initializes the plugin.
 pub fn init<R: Runtime>() -> TauriPlugin<R> {
-    Builder::new("webauthn")
+    Builder::new("passkey")
         .invoke_handler(tauri::generate_handler![
             commands::register,
             commands::authenticate,

@@ -168,7 +168,7 @@ class WebauthnPlugin: Plugin {
 
 // MARK: - Plugin Registration
 
-@_cdecl("init_plugin_webauthn")
+@_cdecl("init_plugin_passkey")
 func initPlugin() -> Plugin {
     WebauthnPlugin()
 }

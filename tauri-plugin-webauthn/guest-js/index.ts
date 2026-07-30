@@ -66,7 +66,7 @@ export type AuthKey = {
   displayName?: string;
 };
 
-export const EVENT_NAME = "tauri-plugin-webauthn";
+export const EVENT_NAME = "tauri-plugin-passkey";
 
 /**
  * Tries to register using the native WebAuthn API.
@@ -79,7 +79,7 @@ export async function register(
   origin: string,
   options: PublicKeyCredentialCreationOptionsJSON
 ): Promise<RegistrationResponseJSON> {
-  return await invoke<RegistrationResponseJSON>("plugin:webauthn|register", {
+  return await invoke<RegistrationResponseJSON>("plugin:passkey|register", {
     origin,
     options,
   });
@@ -96,7 +96,7 @@ export async function authenticate(
   origin: string,
   options: PublicKeyCredentialRequestOptionsJSON
 ): Promise<PublicKeyCredentialJSON> {
-  return await invoke<PublicKeyCredentialJSON>("plugin:webauthn|authenticate", {
+  return await invoke<PublicKeyCredentialJSON>("plugin:passkey|authenticate", {
     origin,
     options,
   });
@@ -110,7 +110,7 @@ export async function authenticate(
  * @returns A promise that resolves when the pin has been sent.
  */
 export async function sendPin(pin: string): Promise<void> {
-  return await invoke("plugin:webauthn|send_pin", {
+  return await invoke("plugin:passkey|send_pin", {
     pin,
   });
 }
@@ -123,7 +123,7 @@ export async function sendPin(pin: string): Promise<void> {
  * @returns A promise that resolves when the uv has been sent.
  */
 export async function selectKey(index: number): Promise<void> {
-  return await invoke("plugin:webauthn|select_key", {
+  return await invoke("plugin:passkey|select_key", {
     key: index,
   });
 }
@@ -135,7 +135,7 @@ export async function selectKey(index: number): Promise<void> {
  * @returns A promise that resolves when the operation has been cancelled.
  */
 export async function cancel(): Promise<void> {
-  return await invoke("plugin:webauthn|cancel");
+  return await invoke("plugin:passkey|cancel");
 }
 
 /**

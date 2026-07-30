@@ -13,7 +13,7 @@
     sendPin,
     PinEventType,
     selectKey
-  } from 'tauri-plugin-webauthn-api';
+  } from 'tauri-plugin-passkey-api';
 
   type LogEntry = {
     time: string;

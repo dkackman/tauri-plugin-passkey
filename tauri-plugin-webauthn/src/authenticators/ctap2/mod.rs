@@ -17,7 +17,7 @@ use super::Authenticator;
 mod event;
 mod platform;
 
-pub const EVENT_NAME: &str = "tauri-plugin-webauthn";
+pub const EVENT_NAME: &str = "tauri-plugin-passkey";
 
 pub struct Webauthn<R: Runtime> {
     manager: Mutex<AuthenticatorService>,

@@ -388,7 +388,7 @@ pub fn run() {
         .build(),
     )
     .plugin(tauri_plugin_opener::init())
-    .plugin(tauri_plugin_webauthn::init())
+    .plugin(tauri_plugin_passkey::init())
     .invoke_handler(tauri::generate_handler![
       reg_start,
       reg_finish,
