@@ -34,7 +34,9 @@ Task numbers below are stable identifiers; **execute in this sequence** so each
 phase's "confirm CI green" check can actually hold (config + lint land before the
 CI rebuild that invokes them):
 
-`0.1 → 0.2 → 0.3 → 1.1 → 1.2 → 1.3 → 1.4 → 3.3 → 3.4 → 2.1 → 2.2 → 2.3 → 2.4 → 3.1 → 3.2 → 3.5 → 4.1 → 4.2 → 4.3 → 4.4`
+`0.1 → 0.2 → 0.3 → 1.1 → 1.2 → 1.3 → 1.4 → 3.3 → 3.4 → 3.2 → 3.5 → 2.1 → 2.2 → 2.3 → 2.4 → 3.1 → 4.1 → 4.2 → 4.3 → 4.4`
+
+(Refined mid-execution: 3.2 verify-package and 3.5 cargo-package-stub also moved before Phase 2, because ci.yml's typescript job calls `pnpm verify:package` and its rust job runs `cargo package` — same "green before CI" principle already approved.)
 
 ## Global Constraints
 
