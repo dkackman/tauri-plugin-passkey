@@ -25,7 +25,7 @@ In your app's `src-tauri/Cargo.toml`:
 
 ```toml
 [dependencies]
-tauri-plugin-webauthn = "0.2"
+tauri-plugin-passkey = "0.2"
 ```
 
 ### 2. Add Swift runtime rpath to build.rs
@@ -48,7 +48,7 @@ In your app's `src-tauri/src/lib.rs`:
 
 ```rust
 tauri::Builder::default()
-    .plugin(tauri_plugin_webauthn::init())
+    .plugin(tauri_plugin_passkey::init())
     // ...
 ```
 
