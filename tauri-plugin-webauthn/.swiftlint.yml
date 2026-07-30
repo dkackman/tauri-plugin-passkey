@@ -6,6 +6,7 @@ disabled_rules:
   - type_body_length # Allow longer class/struct bodies for complex implementations
   - file_length # Allow longer files for complex implementations
   - function_body_length # Allow longer function bodies for complex functions
+  - function_parameter_count # The C-FFI export functions mirror WebAuthn's wide native API surface (domain, challenge, user fields, PRF salts, callback, ...) and can't be reasonably split
 
 opening_brace:
   # SwiftFormat's wrapMultilineStatementBraces puts the opening brace of a wrapped

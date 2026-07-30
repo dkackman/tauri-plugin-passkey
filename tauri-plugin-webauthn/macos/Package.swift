@@ -5,18 +5,19 @@ import PackageDescription
 let package = Package(
     name: "WebauthnBridge",
     platforms: [
-        .macOS(.v13)
+        .macOS(.v13),
     ],
     products: [
         .library(
             name: "WebauthnBridge",
             type: .static,
-            targets: ["WebauthnBridge"]),
+            targets: ["WebauthnBridge"]
+        ),
     ],
     targets: [
         .target(
             name: "WebauthnBridge",
             dependencies: []
-        )
+        ),
     ]
 )

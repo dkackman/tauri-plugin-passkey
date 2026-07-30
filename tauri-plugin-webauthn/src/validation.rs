@@ -52,6 +52,10 @@ fn validation_error(msg: &str) -> crate::Error {
 /// ASCII serialization of the URL's origin (scheme://host[:port], no path,
 /// no trailing slash). Serializing a `Url` directly appends "/" and breaks
 /// servers that string-compare expectedOrigin.
+// Used only by the ctap2 (Linux) backend; kept in the always-compiled validation
+// module so its unit tests run on every platform. #[allow] rather than a cfg gate
+// avoids gating those cross-platform tests.
+#[allow(dead_code)]
 pub fn build_client_data(
     type_: &str,
     challenge: &Base64UrlSafeData,

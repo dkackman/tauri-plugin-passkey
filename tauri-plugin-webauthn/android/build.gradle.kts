@@ -1,6 +1,7 @@
 plugins {
     id("com.android.library")
     id("org.jetbrains.kotlin.android")
+    id("org.jlleitschuh.gradle.ktlint") version "12.1.0"
 }
 
 android {
@@ -42,4 +43,11 @@ dependencies {
     androidTestImplementation("androidx.test.ext:junit:1.1.5")
     androidTestImplementation("androidx.test.espresso:espresso-core:3.5.1")
     implementation(project(":tauri-android"))
+}
+
+ktlint {
+    // Must match the ktlint the CLI runs (bundled with @naturalcycles/ktlint in ../package.json — currently 1.8.0).
+    version.set("1.8.0")
+    android.set(true)
+    ignoreFailures.set(false)
 }
