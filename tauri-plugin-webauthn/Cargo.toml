@@ -55,3 +55,7 @@ webauthn-authenticator-rs = { version = "0.5.0", features = [
   "usb",
   "win10",
 ] }
+# webauthn-authenticator-rs pulls openssl-sys transitively (via webauthn-rs-core).
+# Windows runners/toolchains have no discoverable system OpenSSL, so build it from
+# source. Feature unification makes the transitive openssl-sys build vendored too.
+openssl = { version = "0.10", features = ["vendored"] }
