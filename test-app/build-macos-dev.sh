@@ -388,7 +388,10 @@ codesign --verify --strict --verbose=2 "$BUNDLE_PATH"
 
 echo ""
 echo "Step 5: Signature details..."
-codesign -dv --verbose=4 "$BUNDLE_PATH" 2>&1 | head -20
+# `head` closes the pipe after 20 lines; codesign then dies with SIGPIPE, which
+# under `set -o pipefail` would abort this script before it reaches the launch
+# step below. This is a display-only step, so swallow that pipe failure.
+codesign -dv --verbose=4 "$BUNDLE_PATH" 2>&1 | head -20 || true
 
 echo ""
 echo "Step 6: Verifying entitlements..."
