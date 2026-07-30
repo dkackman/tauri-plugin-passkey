@@ -58,7 +58,7 @@ In `src-tauri/capabilities/default.json`, add the webauthn permission:
 
 ```json
 {
-  "permissions": ["webauthn:default"]
+  "permissions": ["passkey:default"]
 }
 ```
 
