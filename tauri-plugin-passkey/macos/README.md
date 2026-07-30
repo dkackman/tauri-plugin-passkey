@@ -6,7 +6,7 @@ Native passkey registration and authentication on macOS using Apple's [ASAuthori
 
 ```
 Tauri App (Rust)
-  └─ tauri-plugin-webauthn
+  └─ tauri-plugin-passkey
        └─ macos.rs (FFI calls)
             └─ WebauthnBridge (Swift static library)
                  ├─ Exports.swift   - C-callable functions, JSON serialization

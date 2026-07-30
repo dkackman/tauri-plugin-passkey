@@ -7,7 +7,7 @@ set -euo pipefail
 
 VERSION="${1:?usage: bump-version.sh X.Y.Z[-suffix]}"
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-PLUGIN="$ROOT/tauri-plugin-webauthn"
+PLUGIN="$ROOT/tauri-plugin-passkey"
 
 # Only the [package] version sits at column 0 in Cargo.toml; dependency versions are
 # nested, so an anchored match touches just the package version.

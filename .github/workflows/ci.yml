@@ -21,7 +21,7 @@ jobs:
     runs-on: ubuntu-latest
     defaults:
       run:
-        working-directory: tauri-plugin-webauthn
+        working-directory: tauri-plugin-passkey
     steps:
       - uses: actions/checkout@v7
 
@@ -41,7 +41,7 @@ jobs:
           path: |
             ~/.cargo/registry
             ~/.cargo/git
-            tauri-plugin-webauthn/target
+            tauri-plugin-passkey/target
           key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
           restore-keys: |
             ${{ runner.os }}-cargo-
@@ -73,7 +73,7 @@ jobs:
     runs-on: ubuntu-latest
     defaults:
       run:
-        working-directory: tauri-plugin-webauthn
+        working-directory: tauri-plugin-passkey
     steps:
       - uses: actions/checkout@v7
 
@@ -108,7 +108,7 @@ jobs:
     runs-on: macos-latest
     defaults:
       run:
-        working-directory: tauri-plugin-webauthn
+        working-directory: tauri-plugin-passkey
     steps:
       - uses: actions/checkout@v7
 
@@ -152,16 +152,16 @@ jobs:
           ")
           echo "Building against: $device"
           xcodebuild build \
-            -scheme tauri-plugin-webauthn \
+            -scheme tauri-plugin-passkey \
             -destination "platform=iOS Simulator,name=$device"
-        working-directory: tauri-plugin-webauthn/ios
+        working-directory: tauri-plugin-passkey/ios
 
   kotlin:
     name: Kotlin Lint & Tests
     runs-on: ubuntu-latest
     defaults:
       run:
-        working-directory: tauri-plugin-webauthn
+        working-directory: tauri-plugin-passkey
     steps:
       - uses: actions/checkout@v7
 
@@ -223,14 +223,14 @@ jobs:
 
       - name: Run Kotlin unit tests
         run: ./gradlew test --no-daemon
-        working-directory: tauri-plugin-webauthn/android
+        working-directory: tauri-plugin-passkey/android
 
   rust-windows:
     name: Rust Checks (Windows)
     runs-on: windows-latest
     defaults:
       run:
-        working-directory: tauri-plugin-webauthn
+        working-directory: tauri-plugin-passkey
     steps:
       - uses: actions/checkout@v7
 
@@ -245,7 +245,7 @@ jobs:
           path: |
             ~/.cargo/registry
             ~/.cargo/git
-            tauri-plugin-webauthn/target
+            tauri-plugin-passkey/target
           key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
           restore-keys: |
             ${{ runner.os }}-cargo-
@@ -268,7 +268,7 @@ jobs:
     runs-on: macos-latest
     defaults:
       run:
-        working-directory: tauri-plugin-webauthn
+        working-directory: tauri-plugin-passkey
     steps:
       - uses: actions/checkout@v7
 
@@ -283,7 +283,7 @@ jobs:
           path: |
             ~/.cargo/registry
             ~/.cargo/git
-            tauri-plugin-webauthn/target
+            tauri-plugin-passkey/target
           key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
           restore-keys: |
             ${{ runner.os }}-cargo-
@@ -308,7 +308,7 @@ jobs:
     runs-on: ubuntu-latest
     defaults:
       run:
-        working-directory: tauri-plugin-webauthn
+        working-directory: tauri-plugin-passkey
     steps:
       - uses: actions/checkout@v7
 

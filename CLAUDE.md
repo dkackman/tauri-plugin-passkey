@@ -1,26 +1,28 @@
-# Tauri Plugin WebAuthn
+# Tauri Plugin Passkey
 
 A Tauri plugin providing WebAuthn/FIDO2/passkey authentication for Linux, Windows,
 macOS, iOS, and Android.
 
-This is a **pnpm workspace monorepo**: the plugin lives in `tauri-plugin-webauthn/` and
+This is a **pnpm workspace monorepo**: the plugin lives in `tauri-plugin-passkey/` and
 an example app in `test-app/`.
 
 ## Naming: repo vs. runtime identity
 
-The repository, the directory, and the iOS Swift package are all named `webauthn`
-(`tauri-plugin-webauthn`, `net.kackman.webauthn`, `WebauthnPlugin`, etc.) — that naming
-is historical and stays as-is. The published crate/npm identity and the runtime plugin
-name were renamed to `passkey`:
+The repository, the directory, the crate, and npm package are named `passkey`
+(`tauri-plugin-passkey`, `tauri-plugin-passkey-api`). A few native-platform identifiers
+predate that rename and still use the plugin's historical `webauthn` name:
 
-- Crate: `tauri-plugin-passkey` (`Cargo.toml` in `tauri-plugin-webauthn/`)
+- Crate: `tauri-plugin-passkey` (`Cargo.toml` in `tauri-plugin-passkey/`)
 - npm package: `tauri-plugin-passkey-api`
 - Tauri plugin name used by `Builder::new("passkey")` in `src/lib.rs`, invoked from JS
   as `plugin:passkey|<command>`, permissions identifiers `passkey:*`
 - Android plugin class registration still uses `net.kackman.webauthn` / `WebauthnPlugin`
+- The iOS Swift package itself (`ios/Package.swift`) is named `tauri-plugin-passkey`, but
+  its source module/class is still `WebauthnPlugin` (`ios/Sources/WebauthnPlugin/`)
 
-Don't be surprised when file/directory names say `webauthn` but Cargo.toml, package.json,
-and permission strings say `passkey` — that split is intentional.
+Don't be surprised when the Android/iOS native identifiers say `webauthn` but
+Cargo.toml, package.json, and permission strings say `passkey` — that split is
+intentional (renaming the native class/package names is a separate, larger change).
 
 ## Architecture
 
@@ -64,8 +66,8 @@ mobile. Nothing in this repo creates them on a fresh checkout, so Gradle/Xcode b
 and tests fail until you run:
 
 ```bash
-tauri-plugin-webauthn/scripts/materialize-tauri-android.sh
-tauri-plugin-webauthn/scripts/materialize-tauri-ios.sh
+tauri-plugin-passkey/scripts/materialize-tauri-android.sh
+tauri-plugin-passkey/scripts/materialize-tauri-ios.sh
 ```
 
 Required before any Android Gradle task or iOS Xcode build/test.

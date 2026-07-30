@@ -7,7 +7,7 @@ set -euo pipefail
 # only be yanked, never replaced), so this script front-loads the checks that the
 # release workflow would otherwise fail on after the tag already exists.
 
-PKG_DIR="tauri-plugin-webauthn"
+PKG_DIR="tauri-plugin-passkey"
 NPM_PKG="tauri-plugin-passkey-api"
 
 if [ $# -ne 1 ]; then

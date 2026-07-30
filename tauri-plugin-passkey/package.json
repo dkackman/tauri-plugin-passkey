@@ -5,10 +5,10 @@
   "description": "Tauri plugin for WebAuthn / passkey (FIDO2) authentication on macOS/iOS, Windows, Android, and Linux.",
   "repository": {
     "type": "git",
-    "url": "https://github.com/dkackman/tauri-plugin-webauthn"
+    "url": "https://github.com/dkackman/tauri-plugin-passkey"
   },
-  "homepage": "https://github.com/dkackman/tauri-plugin-webauthn",
-  "bugs": "https://github.com/dkackman/tauri-plugin-webauthn/issues",
+  "homepage": "https://github.com/dkackman/tauri-plugin-passkey",
+  "bugs": "https://github.com/dkackman/tauri-plugin-passkey/issues",
   "keywords": [
     "tauri",
     "tauri-plugin",

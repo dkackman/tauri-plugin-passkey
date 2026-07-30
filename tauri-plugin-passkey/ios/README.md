@@ -6,7 +6,7 @@ Native passkey registration and authentication on iOS using Apple's [ASAuthoriza
 
 ```
 Tauri App (Rust)
-  └─ tauri-plugin-webauthn
+  └─ tauri-plugin-passkey
        └─ mobile.rs (run_mobile_plugin calls)
             └─ WebauthnPlugin (Swift, Tauri Plugin)
                  ├─ WebauthnPlugin.swift - Plugin entry point, JSON parsing, response serialization

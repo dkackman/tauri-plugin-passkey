@@ -1,5 +1,5 @@
 packages:
-  - tauri-plugin-webauthn
+  - tauri-plugin-passkey
   - test-app
 
 onlyBuiltDependencies:

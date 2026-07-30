@@ -3,15 +3,15 @@
 import PackageDescription
 
 let package = Package(
-    name: "tauri-plugin-webauthn",
+    name: "tauri-plugin-passkey",
     platforms: [
         .iOS(.v16),
     ],
     products: [
         .library(
-            name: "tauri-plugin-webauthn",
+            name: "tauri-plugin-passkey",
             type: .static,
-            targets: ["tauri-plugin-webauthn"]
+            targets: ["tauri-plugin-passkey"]
         ),
     ],
     dependencies: [
@@ -19,7 +19,7 @@ let package = Package(
     ],
     targets: [
         .target(
-            name: "tauri-plugin-webauthn",
+            name: "tauri-plugin-passkey",
             dependencies: [
                 .byName(name: "Tauri"),
             ],

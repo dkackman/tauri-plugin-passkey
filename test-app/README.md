@@ -1,6 +1,6 @@
 # WebAuthn Example App
 
-A Tauri + SvelteKit example demonstrating the `tauri-plugin-webauthn` plugin across macOS, iOS, and Android.
+A Tauri + SvelteKit example demonstrating the `tauri-plugin-passkey` plugin across macOS, iOS, and Android.
 
 ## Prerequisites
 
