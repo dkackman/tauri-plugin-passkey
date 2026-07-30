@@ -302,3 +302,43 @@ jobs:
       # compile error — but never links.
       - name: Run tests
         run: cargo test
+
+  semver:
+    name: Semver Checks
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: tauri-plugin-webauthn
+    steps:
+      - uses: actions/checkout@v7
+
+      # cargo-semver-checks compares the crate's public API against its last
+      # published release. tauri-plugin-passkey has no crates.io release yet, so the
+      # check has no baseline and is skipped until the first publish — after which it
+      # activates automatically and gates accidental breaking changes (recovering the
+      # release-plz semver_check the fork used to run).
+      - name: Check for a published baseline
+        id: baseline
+        run: |
+          if curl -sf "https://crates.io/api/v1/crates/tauri-plugin-passkey" | grep -q '"max_version"'; then
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::tauri-plugin-passkey is not published on crates.io yet — skipping semver baseline check."
+          fi
+
+      - name: Install Linux dependencies
+        if: steps.baseline.outputs.exists == 'true'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf libudev-dev libpcsclite-dev libssl-dev
+
+      - name: Install Rust toolchain
+        if: steps.baseline.outputs.exists == 'true'
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Run cargo-semver-checks
+        if: steps.baseline.outputs.exists == 'true'
+        uses: obi1kenobi/cargo-semver-checks-action@v2
+        with:
+          package: tauri-plugin-passkey
