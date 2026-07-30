@@ -1,13 +1,15 @@
-import {
-  PublicKeyCredentialCreationOptionsJSON,
-  PublicKeyCredentialJSON,
-  PublicKeyCredentialRequestOptionsJSON,
-  RegistrationResponseJSON,
-} from "@simplewebauthn/types";
 import { invoke } from "@tauri-apps/api/core";
 import { listen, UnlistenFn } from "@tauri-apps/api/event";
 
-export * as types from "@simplewebauthn/types";
+/**
+ * The WebAuthn JSON types used below — `PublicKeyCredentialCreationOptionsJSON`,
+ * `PublicKeyCredentialRequestOptionsJSON`, `RegistrationResponseJSON` and
+ * `AuthenticationResponseJSON` — are standard DOM types, globally available to
+ * any consumer compiling with the `DOM` lib. Only the union of the two response
+ * types has no name in the DOM lib, so it is declared here.
+ */
+export type PublicKeyCredentialJSON =
+  RegistrationResponseJSON | AuthenticationResponseJSON;
 
 export type WebauthnEvent =
   | {
