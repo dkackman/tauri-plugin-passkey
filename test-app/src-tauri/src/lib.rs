@@ -1,8 +1,8 @@
-use std::{collections::HashMap, env, fmt::Debug};
+use std::{collections::HashMap, env, fmt::Debug, path::PathBuf};
 
 use chrono::Local;
 use serde::{Deserialize, Serialize};
-use tauri::{async_runtime::Mutex, State, Url};
+use tauri::{async_runtime::Mutex, AppHandle, Manager, State, Url};
 
 /// Logs an error and converts it to a String for returning to the frontend.
 trait LogErr<T> {
@@ -47,6 +47,57 @@ fn rp_origin() -> String {
 struct RpConfig {
   rp_id: String,
   rp_origin: String,
+}
+
+/// The persisted RP-side state for one RP ID: registered users and their
+/// passkeys (public keys + counters only — nothing secret).
+#[derive(Default, Serialize, Deserialize)]
+struct RpStore {
+  users: HashMap<String, Uuid>,
+  passkeys: HashMap<Uuid, Vec<Passkey>>,
+}
+
+const STORE_FILE: &str = "passkey-store.json";
+
+fn store_path(app: &AppHandle) -> Result<PathBuf, String> {
+  let dir = app
+    .path()
+    .app_data_dir()
+    .log_err("Failed to resolve app data dir")?;
+  std::fs::create_dir_all(&dir).log_err("Failed to create app data dir")?;
+  Ok(dir.join(STORE_FILE))
+}
+
+/// Passkeys are scoped to an RP, and the app can switch RP config at runtime,
+/// so the file holds a store per RP ID.
+fn read_all_stores(app: &AppHandle) -> HashMap<String, RpStore> {
+  store_path(app)
+    .ok()
+    .and_then(|path| std::fs::read_to_string(path).ok())
+    .and_then(|json| serde_json::from_str(&json).ok())
+    .unwrap_or_default()
+}
+
+fn load_rp_store(app: &AppHandle, rp_id: &str) -> RpStore {
+  read_all_stores(app).remove(rp_id).unwrap_or_default()
+}
+
+fn save_rp_store(
+  app: &AppHandle,
+  rp_id: &str,
+  users: &HashMap<String, Uuid>,
+  passkeys: &HashMap<Uuid, Vec<Passkey>>,
+) -> Result<(), String> {
+  let mut all = read_all_stores(app);
+  all.insert(
+    rp_id.to_string(),
+    RpStore {
+      users: users.clone(),
+      passkeys: passkeys.clone(),
+    },
+  );
+  let json = serde_json::to_string_pretty(&all).log_err("Failed to serialize passkey store")?;
+  std::fs::write(store_path(app)?, json).log_err("Failed to write passkey store")
 }
 
 fn build_webauthn(rp_id: &str, rp_origin: &str) -> Result<Webauthn, String> {
@@ -117,9 +168,12 @@ async fn reg_start(
 
 #[tauri::command]
 async fn reg_finish(
+  app: AppHandle,
   state: State<'_, Mutex<Option<(PasskeyRegistration, Uuid)>>>,
   passkeys: State<'_, Mutex<HashMap<Uuid, Vec<Passkey>>>>,
+  users: State<'_, Mutex<HashMap<String, Uuid>>>,
   webauthn: State<'_, Mutex<Webauthn>>,
+  config: State<'_, Mutex<RpConfig>>,
   response: RegisterPublicKeyCredential,
 ) -> Result<(), String> {
   let (passkey_reg, uuid) = state
@@ -134,7 +188,11 @@ async fn reg_finish(
     .finish_passkey_registration(&response, &passkey_reg)
     .log_err("Failed to verify registration")?;
 
-  passkeys.lock().await.entry(uuid).or_default().push(passkey);
+  let mut passkeys = passkeys.lock().await;
+  passkeys.entry(uuid).or_default().push(passkey);
+
+  let rp_id = config.lock().await.rp_id.clone();
+  save_rp_store(&app, &rp_id, &*users.lock().await, &passkeys)?;
 
   Ok(())
 }
@@ -253,9 +311,12 @@ struct PrfResults {
 
 #[tauri::command]
 async fn auth_finish(
+  app: AppHandle,
   webauthn: State<'_, Mutex<Webauthn>>,
   state: State<'_, Mutex<Option<DiscoverableAuthentication>>>,
   passkeys: State<'_, Mutex<HashMap<Uuid, Vec<Passkey>>>>,
+  users: State<'_, Mutex<HashMap<String, Uuid>>>,
+  config: State<'_, Mutex<RpConfig>>,
   response: PublicKeyCredential,
 ) -> Result<Option<PrfResults>, String> {
   let (user, cred_id) = webauthn
@@ -269,7 +330,7 @@ async fn auth_finish(
     .await
     .get(&user)
     .and_then(|p| p.iter().find(|p| p.cred_id() == cred_id))
-    .log_none("Passkey not found. You may need to register again in this session.")?
+    .log_none("Passkey not found. You may need to register again.")?
     .clone();
 
   let passkey_auth = state
@@ -278,11 +339,22 @@ async fn auth_finish(
     .take()
     .log_none("No pending authentication. Did you call authenticate first?")?;
 
-  webauthn
+  let auth_result = webauthn
     .lock()
     .await
     .finish_discoverable_authentication(&response, passkey_auth, &[(&passkey).into()])
     .log_err("Failed to verify authentication")?;
+
+  {
+    let mut passkeys = passkeys.lock().await;
+    if let Some(user_passkeys) = passkeys.get_mut(&user) {
+      for passkey in user_passkeys.iter_mut() {
+        passkey.update_credential(&auth_result);
+      }
+    }
+    let rp_id = config.lock().await.rp_id.clone();
+    save_rp_store(&app, &rp_id, &*users.lock().await, &passkeys)?;
+  }
 
   // Extract PRF results from clientExtensionResults. Note: this field is NOT
   // covered by the authenticator's signature per the WebAuthn spec. On macOS/iOS
@@ -306,8 +378,12 @@ async fn auth_finish(
 
 #[tauri::command]
 async fn auth_finish_non_discoverable(
+  app: AppHandle,
   webauthn: State<'_, Mutex<Webauthn>>,
   state: State<'_, Mutex<Option<PasskeyAuthentication>>>,
+  passkeys: State<'_, Mutex<HashMap<Uuid, Vec<Passkey>>>>,
+  users: State<'_, Mutex<HashMap<String, Uuid>>>,
+  config: State<'_, Mutex<RpConfig>>,
   response: PublicKeyCredential,
 ) -> Result<Option<PrfResults>, String> {
   let passkey_auth = state
@@ -315,10 +391,22 @@ async fn auth_finish_non_discoverable(
     .await
     .take()
     .log_none("No pending authentication. Did you call authenticate first?")?;
-  let webauthn = webauthn.lock().await;
-  webauthn
+  let auth_result = webauthn
+    .lock()
+    .await
     .finish_passkey_authentication(&response, &passkey_auth)
     .log_err("Failed to verify authentication")?;
+
+  {
+    let mut passkeys = passkeys.lock().await;
+    for user_passkeys in passkeys.values_mut() {
+      for passkey in user_passkeys.iter_mut() {
+        passkey.update_credential(&auth_result);
+      }
+    }
+    let rp_id = config.lock().await.rp_id.clone();
+    save_rp_store(&app, &rp_id, &*users.lock().await, &passkeys)?;
+  }
 
   // Extract PRF results from clientExtensionResults. Note: this field is NOT
   // covered by the authenticator's signature per the WebAuthn spec. On macOS/iOS
@@ -347,13 +435,23 @@ async fn get_rp_config(config: State<'_, Mutex<RpConfig>>) -> Result<RpConfig, S
 
 #[tauri::command]
 async fn set_rp_config(
+  app: AppHandle,
   webauthn: State<'_, Mutex<Webauthn>>,
   config: State<'_, Mutex<RpConfig>>,
+  passkeys: State<'_, Mutex<HashMap<Uuid, Vec<Passkey>>>>,
+  users: State<'_, Mutex<HashMap<String, Uuid>>>,
   rp_id: String,
   rp_origin: String,
 ) -> Result<(), String> {
   let new_webauthn = build_webauthn(&rp_id, &rp_origin)?;
   *webauthn.lock().await = new_webauthn;
+
+  // The store on disk is written after every mutation, so on an RP switch we
+  // only need to swap in the persisted state for the new RP ID.
+  let store = load_rp_store(&app, &rp_id);
+  *users.lock().await = store.users;
+  *passkeys.lock().await = store.passkeys;
+
   *config.lock().await = RpConfig { rp_id, rp_origin };
   Ok(())
 }
@@ -368,14 +466,19 @@ pub fn run() {
 
   let webauthn = build_webauthn(&rp_id, &rp_origin).expect("Failed to build Webauthn");
 
+  let initial_rp_id = rp_id.clone();
   tauri::Builder::default()
     .manage(Mutex::new(webauthn))
     .manage(Mutex::new(RpConfig { rp_id, rp_origin }))
     .manage(Mutex::new(Option::<DiscoverableAuthentication>::None))
     .manage(Mutex::new(Option::<PasskeyAuthentication>::None))
     .manage(Mutex::new(Option::<(PasskeyRegistration, Uuid)>::None))
-    .manage(Mutex::new(HashMap::<Uuid, Vec<Passkey>>::new()))
-    .manage(Mutex::new(HashMap::<String, Uuid>::new()))
+    .setup(move |app| {
+      let store = load_rp_store(app.handle(), &initial_rp_id);
+      app.manage(Mutex::new(store.passkeys));
+      app.manage(Mutex::new(store.users));
+      Ok(())
+    })
     .plugin(
       tauri_plugin_log::Builder::new()
         .clear_targets()
