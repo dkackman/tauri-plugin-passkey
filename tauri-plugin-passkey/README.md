@@ -15,7 +15,7 @@ It is a nearly drop-in replacement for the `@simplewebauthn/browser` package wit
 
 ### macOS
 
-macOS support uses Apple's ASAuthorization framework for native passkey and security key authentication. It requires macOS 13+, code signing with Associated Domains entitlements, and a provisioning profile.
+macOS support uses Apple's ASAuthorization framework for native passkey and security key authentication. It requires macOS 14+, code signing with Associated Domains entitlements, and a provisioning profile.
 
 See [macos/README.md](macos/README.md) for setup instructions.
 

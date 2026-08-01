@@ -154,6 +154,15 @@ pub fn perform_authentication(
     hasher.update(&client_data);
     let client_data_hash = hasher.finish();
 
+    // Keep the allow-list ids: CTAP2.0 authenticators may omit `credentials`
+    // from the assertion, and a single-entry allow list is then the only way
+    // to recover which credential signed.
+    let allowed_ids: Vec<Vec<u8>> = options
+        .allow_credentials
+        .iter()
+        .map(|c| c.id.to_vec())
+        .collect();
+
     let args = SignArgs {
         pin: None,
         relying_party_id: options.rp_id.clone(),
@@ -191,13 +200,22 @@ pub fn perform_authentication(
     #[cfg(feature = "log")]
     log::debug!("Sign succeeded");
 
-    // `credentials` is legitimately absent when a single discoverable
-    // credential matched, so fall back to an empty id rather than panicking.
-    let raw_id = result
-        .assertion
-        .credentials
-        .map(|c| c.id)
-        .unwrap_or_default();
+    // `credentials` was optional in CTAP2.0: authenticators may omit it when
+    // the client already knows which credential signed. A single-entry allow
+    // list identifies that credential; otherwise (discoverable-credential
+    // flow) there is nothing to fall back on and an empty id would only fail
+    // later at the relying party, so surface a protocol error here instead.
+    let raw_id = match result.assertion.credentials {
+        Some(c) => c.id,
+        None => match allowed_ids.as_slice() {
+            [only] => only.clone(),
+            _ => {
+                return Err(crate::Error::Authenticator(
+                    "authenticator did not return a credential id".to_string(),
+                ))
+            }
+        },
+    };
     let auth_data = result.assertion.auth_data.to_vec();
 
     Ok(PublicKeyCredential {

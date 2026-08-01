@@ -27,10 +27,8 @@ final class PasskeyHandler: NSObject {
         }
 
         if !excludeCredentials.isEmpty {
-            if #available(iOS 17.4, *) {
-                platformRequest.excludedCredentials = excludeCredentials.map {
-                    ASAuthorizationPlatformPublicKeyCredentialDescriptor(credentialID: $0)
-                }
+            platformRequest.excludedCredentials = excludeCredentials.map {
+                ASAuthorizationPlatformPublicKeyCredentialDescriptor(credentialID: $0)
             }
         }
 

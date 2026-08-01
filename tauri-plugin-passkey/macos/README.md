@@ -277,7 +277,7 @@ Example server-side registration options:
 
 - **Credential providers**: Only iCloud Keychain appears in the [ASAuthorization](https://developer.apple.com/documentation/authenticationservices/asauthorizationcontroller) sheet. Third-party providers like 1Password do not yet implement the macOS [Credential Provider API](https://developer.apple.com/documentation/authenticationservices/ascredentialproviderextensioncontext).
 - **`?mode=developer`**: The [associated domains developer mode](https://developer.apple.com/documentation/xcode/configuring-an-associated-domain#Test-the-association-during-development) bypass does **not** work with Developer ID-signed apps. It only works with Xcode development-signed builds. For Developer ID apps, the AASA must be live and cached by Apple's CDN.
-- **macOS version**: Requires macOS 13+ (Ventura). The `ASAuthorizationPlatformPublicKeyCredentialProvider` API was [introduced in macOS 12](https://developer.apple.com/documentation/authenticationservices/asauthorizationplatformpublickeycredentialprovider), but the Swift package targets macOS 13 for broader `async/await` support.
+- **macOS version**: Requires macOS 14+ (Sonoma). The `ASAuthorizationPlatformPublicKeyCredentialProvider` API was [introduced in macOS 12](https://developer.apple.com/documentation/authenticationservices/asauthorizationplatformpublickeycredentialprovider), but the Swift package targets macOS 14 so the platform authenticator can honor `excludeCredentials` (added to the platform provider in macOS 14).
 
 ## Troubleshooting
 

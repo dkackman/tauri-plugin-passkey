@@ -5,7 +5,7 @@ import PackageDescription
 let package = Package(
     name: "tauri-plugin-passkey",
     platforms: [
-        .iOS(.v16),
+        .iOS("17.4"),
     ],
     products: [
         .library(

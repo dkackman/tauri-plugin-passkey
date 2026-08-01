@@ -26,10 +26,8 @@ public final class PasskeyHandler: NSObject {
         }
 
         if !excludeCredentials.isEmpty {
-            if #available(macOS 14.0, *) {
-                platformRequest.excludedCredentials = excludeCredentials.map {
-                    ASAuthorizationPlatformPublicKeyCredentialDescriptor(credentialID: $0)
-                }
+            platformRequest.excludedCredentials = excludeCredentials.map {
+                ASAuthorizationPlatformPublicKeyCredentialDescriptor(credentialID: $0)
             }
         }
 

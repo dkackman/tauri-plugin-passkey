@@ -17,6 +17,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
+import org.json.JSONObject
 
 @TauriPlugin
 class WebauthnPlugin(
@@ -33,7 +34,7 @@ class WebauthnPlugin(
 
         val createPublicKeyCredentialRequest =
             CreatePublicKeyCredentialRequest(
-                requestJson = args,
+                requestJson = translateRegistrationRequest(args),
             )
 
         currentJob =
@@ -47,7 +48,7 @@ class WebauthnPlugin(
 
                     when (result) {
                         is CreatePublicKeyCredentialResponse -> {
-                            invoke.resolve(JSObject(result.registrationResponseJson))
+                            invoke.resolve(flattenPrfOutput(result.registrationResponseJson))
                         }
 
                         else -> {
@@ -70,7 +71,7 @@ class WebauthnPlugin(
 
         val getPublicKeyCredentialOption =
             GetPublicKeyCredentialOption(
-                requestJson = args,
+                requestJson = translateAuthenticationRequest(args),
             )
         val getCredRequest =
             GetCredentialRequest(
@@ -89,7 +90,7 @@ class WebauthnPlugin(
 
                     when (result) {
                         is PublicKeyCredential -> {
-                            invoke.resolve(JSObject(result.authenticationResponseJson))
+                            invoke.resolve(flattenPrfOutput(result.authenticationResponseJson))
                         }
 
                         else -> {
@@ -111,5 +112,66 @@ class WebauthnPlugin(
         currentJob?.cancel()
         currentJob = null
         invoke.resolve()
+    }
+
+    private companion object {
+        // webauthn-rs serializes the PRF extension under its legacy hmac-secret
+        // names (`hmacCreateSecret`/`hmacGetSecret`); Credential Manager only
+        // understands the standard WebAuthn `prf` key. The iOS/macOS bridges do
+        // the equivalent translation into ASAuthorization PRF inputs.
+        fun translateRegistrationRequest(requestJson: String): String {
+            val request = JSONObject(requestJson)
+            val extensions = request.optJSONObject("extensions") ?: return requestJson
+            if (extensions.optBoolean("hmacCreateSecret", false)) {
+                extensions.put("prf", JSONObject())
+            }
+            extensions.remove("hmacCreateSecret")
+            return request.toString()
+        }
+
+        fun translateAuthenticationRequest(requestJson: String): String {
+            val request = JSONObject(requestJson)
+            val extensions = request.optJSONObject("extensions") ?: return requestJson
+            extensions.optJSONObject("hmacGetSecret")?.let { hmacGetSecret ->
+                val eval = JSONObject()
+                eval.put("first", hmacGetSecret.getString("output1"))
+                hmacGetSecret
+                    .optString("output2")
+                    .takeIf { it.isNotEmpty() }
+                    ?.let { eval.put("second", it) }
+                extensions.put("prf", JSONObject().put("eval", eval))
+            }
+            extensions.remove("hmacGetSecret")
+            return request.toString()
+        }
+
+        // The shared Rust parser (mobile.rs) expects a flat top-level `prf`
+        // object — {"enabled": bool} after registration, {"first"/"second":
+        // base64url} after authentication — matching what the Swift bridges
+        // emit, while Credential Manager nests it under clientExtensionResults.
+        fun flattenPrfOutput(responseJson: String): JSObject {
+            val response = JSObject(responseJson)
+            val prf =
+                response
+                    .optJSONObject("clientExtensionResults")
+                    ?.optJSONObject("prf")
+                    ?: return response
+            val flat = JSONObject()
+            if (prf.has("enabled")) {
+                flat.put("enabled", prf.getBoolean("enabled"))
+            }
+            prf.optJSONObject("results")?.let { results ->
+                results
+                    .optString("first")
+                    .takeIf { it.isNotEmpty() }
+                    ?.let { flat.put("first", it) }
+                results
+                    .optString("second")
+                    .takeIf { it.isNotEmpty() }
+                    ?.let { flat.put("second", it) }
+            }
+            response.put("prf", flat)
+            return response
+        }
     }
 }

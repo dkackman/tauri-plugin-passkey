@@ -217,14 +217,14 @@ iOS presents a unified system sheet that lets the user choose between available 
 | Presentation anchor   | `NSWindow`                                         | `UIWindow` via `UIWindowScene`            |
 | `?mode=developer`     | Does **not** work with Developer ID builds         | Works with development-signed builds      |
 | Third-party providers | Not supported (no macOS Credential Provider API)   | Supported via iOS Credential Provider API |
-| Minimum OS            | macOS 13 (Ventura)                                 | iOS 16                                    |
+| Minimum OS            | macOS 14 (Sonoma)                                  | iOS 17.4                                  |
 | Code signing          | Developer ID + provisioning profile + notarization | Xcode-managed development signing         |
 | Build command         | `pnpm tauri dev`                                   | `pnpm tauri ios dev`                      |
 
 ## Limitations
 
 - **Simulator**: The iOS Simulator does not support passkey operations. You must use a physical device.
-- **iOS version**: Requires iOS 16+. The `ASAuthorizationPlatformPublicKeyCredentialProvider` API was introduced in iOS 15, but the plugin targets iOS 16 as the minimum deployment target (matching Tauri's iOS requirements).
+- **iOS version**: Requires iOS 17.4+. The `ASAuthorizationPlatformPublicKeyCredentialProvider` API was introduced in iOS 15, but the plugin targets iOS 17.4 as the minimum deployment target so the platform authenticator can honor `excludeCredentials` (added to the platform provider in iOS 17.4).
 - **Security key transports**: The plugin requests `allSupported` transports for security key credentials. Transport filtering based on the WebAuthn options is not currently implemented.
 
 ## Troubleshooting
