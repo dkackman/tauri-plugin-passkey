@@ -1,3 +1,3 @@
-package de.webauthn.test
+package net.kackman.webauthn.example
 
 class MainActivity : TauriActivity()

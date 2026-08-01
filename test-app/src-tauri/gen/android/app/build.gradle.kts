@@ -16,10 +16,10 @@ val tauriProperties = Properties().apply {
 
 android {
     compileSdk = 34
-    namespace = "de.webauthn.test"
+    namespace = "net.kackman.webauthn.example"
     defaultConfig {
         manifestPlaceholders["usesCleartextTraffic"] = "false"
-        applicationId = "de.webauthn.test"
+        applicationId = "net.kackman.webauthn.example"
         minSdk = 28
         targetSdk = 34
         versionCode = tauriProperties.getProperty("tauri.android.versionCode", "1").toInt()

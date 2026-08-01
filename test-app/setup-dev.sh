@@ -77,10 +77,10 @@ echo "Find your Team ID at: https://developer.apple.com/account#MembershipDetail
 echo ""
 
 while true; do
-    read -rp "Apple Developer Team ID (e.g., ABCDE12345): " TEAM_ID
+    read -rp "Apple Developer Team ID (e.g., ABCDE12345) [86TDY6D9V2]: " TEAM_ID
     # Team IDs are uppercase. build-macos-dev.sh matches this value against the
     # signing certificate's OU exactly, so normalize rather than reject.
-    TEAM_ID=$(printf '%s' "$TEAM_ID" | tr -d '[:space:]' | tr '[:lower:]' '[:upper:]')
+    TEAM_ID=$(printf '%s' "${TEAM_ID:-86TDY6D9V2}" | tr -d '[:space:]' | tr '[:lower:]' '[:upper:]')
     if [[ "$TEAM_ID" =~ ^[A-Z0-9]{10}$ ]]; then
         break
     fi
@@ -88,8 +88,8 @@ while true; do
 done
 
 while true; do
-    read -rp "Bundle identifier (e.g., com.example.webauthn) [de.webauthn.test]: " BUNDLE_ID
-    BUNDLE_ID=$(printf '%s' "${BUNDLE_ID:-de.webauthn.test}" | tr -d '[:space:]')
+    read -rp "Bundle identifier (e.g., com.example.webauthn) [net.kackman.webauthn.example]: " BUNDLE_ID
+    BUNDLE_ID=$(printf '%s' "${BUNDLE_ID:-net.kackman.webauthn.example}" | tr -d '[:space:]')
     if [[ "$BUNDLE_ID" =~ ^[A-Za-z0-9-]+(\.[A-Za-z0-9-]+)+$ ]]; then
         break
     fi
@@ -98,8 +98,8 @@ while true; do
 done
 
 while true; do
-    read -rp "Associated domain for passkeys (e.g., webauthn.example.com): " DOMAIN
-    DOMAIN=$(printf '%s' "$DOMAIN" | tr -d '[:space:]')
+    read -rp "Associated domain for passkeys (e.g., webauthn.example.com) [webauthn.dkackman.com]: " DOMAIN
+    DOMAIN=$(printf '%s' "${DOMAIN:-webauthn.dkackman.com}" | tr -d '[:space:]')
     if [[ "$DOMAIN" =~ ^[A-Za-z0-9]([A-Za-z0-9-]*[A-Za-z0-9])?(\.[A-Za-z0-9]([A-Za-z0-9-]*[A-Za-z0-9])?)+$ ]]; then
         break
     fi

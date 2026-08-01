@@ -32,8 +32,8 @@ impl<T> LogNone<T> for Option<T> {
   }
 }
 
-const DEFAULT_RP_ID: &str = "tauri-plugin-passkey-example.glitch.me";
-const DEFAULT_RP_ORIGIN: &str = "https://tauri-plugin-passkey-example.glitch.me/";
+const DEFAULT_RP_ID: &str = "webauthn.dkackman.com";
+const DEFAULT_RP_ORIGIN: &str = "https://webauthn.dkackman.com/";
 
 fn rp_id() -> String {
   env::var("WEBAUTHN_RP_ID").unwrap_or_else(|_| DEFAULT_RP_ID.to_string())
