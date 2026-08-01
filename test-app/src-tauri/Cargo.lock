@@ -4936,7 +4936,7 @@ dependencies = [
 name = "webauthn"
 version = "0.1.0"
 dependencies = [
- "base64 0.22.1",
+ "base64 0.23.0",
  "chrono",
  "dotenvy",
  "log",
