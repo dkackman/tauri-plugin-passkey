@@ -8,6 +8,8 @@ mod authenticators;
 mod commands;
 mod error;
 mod validation;
+#[cfg(test)]
+mod wire_contract;
 
 pub use error::{Error, Result};
 
