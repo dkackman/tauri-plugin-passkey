@@ -25,8 +25,10 @@ type Webauthn<R> = authenticators::windows::Webauthn<R>;
 #[cfg(mobile)]
 type Webauthn<R> = authenticators::mobile::Webauthn<R>;
 
-/// Extensions to [`tauri::App`], [`tauri::AppHandle`] and [`tauri::Window`] to access the webauthn APIs.
-pub trait WebauthnExt<R: Runtime> {
+/// Crate-internal accessor for the platform authenticator state.
+/// Not public: the return type is a private, cfg-selected alias, so this
+/// trait cannot be meaningfully used outside the crate.
+pub(crate) trait WebauthnExt<R: Runtime> {
     fn webauthn(&self) -> &Webauthn<R>;
 }
 
