@@ -2,7 +2,6 @@ import AuthenticationServices
 import Foundation
 import UIKit
 
-@available(iOS 15.0, *)
 @MainActor
 final class PasskeyHandler: NSObject {
     private var registrationContinuation: CheckedContinuation<ASAuthorization, Error>?
@@ -123,7 +122,6 @@ final class PasskeyHandler: NSObject {
 
 // MARK: - ASAuthorizationControllerDelegate
 
-@available(iOS 15.0, *)
 extension PasskeyHandler: ASAuthorizationControllerDelegate, ASAuthorizationControllerPresentationContextProviding {
     func presentationAnchor(for _: ASAuthorizationController) -> ASPresentationAnchor {
         let scene = UIApplication.shared.connectedScenes
@@ -174,7 +172,6 @@ enum PasskeyHandlerError: LocalizedError {
     }
 }
 
-@available(iOS 15.0, *)
 func registrationJSON(from auth: ASAuthorization) throws -> [String: Any] {
     guard let reg = auth.credential as? ASAuthorizationPublicKeyCredentialRegistration else {
         throw PasskeyHandlerError.unexpectedCredentialType
@@ -204,7 +201,6 @@ func registrationJSON(from auth: ASAuthorization) throws -> [String: Any] {
     return json
 }
 
-@available(iOS 15.0, *)
 func assertionJSON(from auth: ASAuthorization) throws -> [String: Any] {
     guard let assertion = auth.credential as? ASAuthorizationPublicKeyCredentialAssertion else {
         throw PasskeyHandlerError.unexpectedCredentialType

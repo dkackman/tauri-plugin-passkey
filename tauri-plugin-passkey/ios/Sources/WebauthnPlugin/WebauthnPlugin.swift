@@ -60,10 +60,6 @@ class WebauthnPlugin: Plugin {
     @MainActor private var activeHandler: PasskeyHandler?
 
     @objc func cancel(_ invoke: Invoke) {
-        guard #available(iOS 15.0, *) else {
-            invoke.resolve()
-            return
-        }
         Task { @MainActor in
             self.activeHandler?.cancel()
             self.activeHandler = nil
@@ -72,11 +68,6 @@ class WebauthnPlugin: Plugin {
     }
 
     @objc func register(_ invoke: Invoke) {
-        guard #available(iOS 15.0, *) else {
-            invoke.reject("WebAuthn requires iOS 15.0 or later")
-            return
-        }
-
         // The Rust side sends serde_json::to_string(&options) via run_mobile_plugin
         // which double-serializes: the JSON string is itself JSON-encoded
         guard let jsonString = try? invoke.parseArgs(String.self),
@@ -120,11 +111,6 @@ class WebauthnPlugin: Plugin {
     }
 
     @objc func authenticate(_ invoke: Invoke) {
-        guard #available(iOS 15.0, *) else {
-            invoke.reject("WebAuthn requires iOS 15.0 or later")
-            return
-        }
-
         guard let jsonString = try? invoke.parseArgs(String.self),
               let jsonData = jsonString.data(using: .utf8),
               let options = try? JSONDecoder().decode(AuthenticationOptions.self, from: jsonData)
