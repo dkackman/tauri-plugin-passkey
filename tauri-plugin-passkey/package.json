@@ -39,7 +39,9 @@
     "verify:package": "node scripts/verify-package.mjs",
     "prepublishOnly": "pnpm build && pnpm verify:package",
     "pretest": "pnpm build",
-    "test": "pnpm test:rust && (pnpm test:swift || echo '⚠️  Swift tests skipped (require iOS simulator)') && pnpm test:android",
+    "test": "pnpm test:js && pnpm test:rust && (pnpm test:swift || echo '⚠️  Swift tests skipped (require iOS simulator)') && pnpm test:android",
+    "test:js": "vitest run",
+    "test:js:watch": "vitest",
     "test:rust": "cargo test",
     "test:swift": "cd ios && swift test",
     "test:android": "cd android && (./gradlew test || gradle test || echo 'Note: Gradle wrapper not found. Install Gradle or run from Android Studio')",
@@ -65,6 +67,7 @@
     "@rollup/plugin-typescript": "^12.3.0",
     "rollup": "^4.62.2",
     "tslib": "^2.8.1",
-    "typescript": "^6.0.3"
+    "typescript": "^6.0.3",
+    "vitest": "^4.1.10"
   }
 }

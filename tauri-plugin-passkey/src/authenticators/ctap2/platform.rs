@@ -449,3 +449,272 @@ fn convert_resident_key(
         None => ResidentKeyRequirement::Preferred,
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn selection(
+        resident_key: Option<webauthn_rs_proto::ResidentKeyRequirement>,
+        require_resident_key: bool,
+    ) -> webauthn_rs_proto::AuthenticatorSelectionCriteria {
+        webauthn_rs_proto::AuthenticatorSelectionCriteria {
+            authenticator_attachment: None,
+            resident_key,
+            require_resident_key,
+            user_verification: webauthn_rs_proto::UserVerificationPolicy::Preferred,
+        }
+    }
+
+    #[test]
+    fn convert_salt_accepts_exactly_32_bytes() {
+        let salt = vec![7u8; 32];
+        let out = convert_salt(salt.clone()).unwrap();
+        assert_eq!(out.as_slice(), salt.as_slice());
+    }
+
+    #[test]
+    fn convert_salt_rejects_wrong_length_and_reports_it() {
+        let err = convert_salt(vec![0u8; 16]).unwrap_err();
+        assert!(err.to_string().contains("32 bytes"));
+        assert!(err.to_string().contains("16"));
+        assert!(convert_salt(vec![0u8; 33]).is_err());
+        assert!(convert_salt(vec![]).is_err());
+    }
+
+    #[test]
+    fn convert_user_verification_maps_every_policy() {
+        use webauthn_rs_proto::UserVerificationPolicy as P;
+        assert_eq!(
+            convert_user_verification(P::Required),
+            UserVerificationRequirement::Required
+        );
+        assert_eq!(
+            convert_user_verification(P::Preferred),
+            UserVerificationRequirement::Preferred
+        );
+        assert_eq!(
+            convert_user_verification(P::Discouraged_DO_NOT_USE),
+            UserVerificationRequirement::Discouraged
+        );
+    }
+
+    #[test]
+    fn convert_resident_key_prefers_the_enum_when_present() {
+        use webauthn_rs_proto::ResidentKeyRequirement as R;
+        assert_eq!(
+            convert_resident_key(Some(&selection(Some(R::Required), false))),
+            ResidentKeyRequirement::Required
+        );
+        assert_eq!(
+            convert_resident_key(Some(&selection(Some(R::Discouraged), true))),
+            ResidentKeyRequirement::Discouraged
+        );
+    }
+
+    #[test]
+    fn convert_resident_key_falls_back_to_the_level1_boolean() {
+        // Enum absent + require_resident_key=true => Required (WebAuthn L1).
+        assert_eq!(
+            convert_resident_key(Some(&selection(None, true))),
+            ResidentKeyRequirement::Required
+        );
+        // Enum absent + boolean false => Preferred (the crate's default).
+        assert_eq!(
+            convert_resident_key(Some(&selection(None, false))),
+            ResidentKeyRequirement::Preferred
+        );
+    }
+
+    #[test]
+    fn convert_resident_key_defaults_to_preferred_without_selection() {
+        assert_eq!(
+            convert_resident_key(None),
+            ResidentKeyRequirement::Preferred
+        );
+    }
+
+    #[test]
+    fn convert_transports_maps_known_and_drops_hybrid() {
+        use webauthn_rs_proto::AuthenticatorTransport as T;
+        let out = convert_transports(vec![T::Usb, T::Nfc, T::Ble, T::Internal, T::Hybrid]);
+        assert_eq!(
+            out,
+            vec![
+                Transport::USB,
+                Transport::NFC,
+                Transport::BLE,
+                Transport::Internal
+            ]
+        );
+    }
+
+    #[test]
+    fn convert_algorithms_keeps_known_cose_algs_and_filters_unknown() {
+        let params = vec![
+            webauthn_rs_proto::PubKeyCredParams {
+                type_: "public-key".to_string(),
+                alg: -7, // ES256
+            },
+            webauthn_rs_proto::PubKeyCredParams {
+                type_: "public-key".to_string(),
+                alg: 999_999, // not a COSE algorithm
+            },
+        ];
+        let out = convert_algorithms(params);
+        assert_eq!(
+            out,
+            vec![PublicKeyCredentialParameters {
+                alg: COSEAlgorithm::ES256
+            }]
+        );
+    }
+
+    #[test]
+    fn convert_exclude_list_is_empty_when_absent() {
+        assert!(convert_exclude_list(None).is_empty());
+    }
+
+    #[test]
+    fn convert_exclude_list_maps_ids_and_transports() {
+        use webauthn_rs_proto::AuthenticatorTransport as T;
+        let list = vec![webauthn_rs_proto::PublicKeyCredentialDescriptor {
+            type_: "public-key".to_string(),
+            id: vec![1u8, 2, 3].into(),
+            transports: Some(vec![T::Usb]),
+        }];
+        let out = convert_exclude_list(Some(list));
+        assert_eq!(out.len(), 1);
+        assert_eq!(out[0].id, vec![1u8, 2, 3]);
+        assert_eq!(out[0].transports, vec![Transport::USB]);
+    }
+
+    #[test]
+    fn convert_allow_list_defaults_transports_to_empty() {
+        let list = vec![webauthn_rs_proto::AllowCredentials {
+            type_: "public-key".to_string(),
+            id: vec![9u8, 9].into(),
+            transports: None,
+        }];
+        let out = convert_allow_list(list);
+        assert_eq!(out.len(), 1);
+        assert_eq!(out[0].id, vec![9u8, 9]);
+        assert!(out[0].transports.is_empty());
+    }
+
+    #[test]
+    fn convert_request_authentication_extensions_defaults_when_none() {
+        let out = convert_request_authentication_extensions(None).unwrap();
+        assert!(out.hmac_get_secret.is_none());
+        assert!(out.app_id.is_none());
+    }
+
+    #[test]
+    fn convert_request_authentication_extensions_maps_valid_prf_salts() {
+        let ext = webauthn_rs_proto::RequestAuthenticationExtensions {
+            appid: Some("https://appid.example".to_string()),
+            uvm: None,
+            hmac_get_secret: Some(webauthn_rs_proto::HmacGetSecretInput {
+                output1: vec![1u8; 32].into(),
+                output2: Some(vec![2u8; 32].into()),
+            }),
+        };
+        let out = convert_request_authentication_extensions(Some(ext)).unwrap();
+        assert_eq!(out.app_id.as_deref(), Some("https://appid.example"));
+        let hmac = out.hmac_get_secret.unwrap();
+        assert_eq!(hmac.salt1, [1u8; 32]);
+        assert_eq!(hmac.salt2, Some([2u8; 32]));
+    }
+
+    #[test]
+    fn convert_request_authentication_extensions_rejects_bad_salt_length() {
+        let ext = webauthn_rs_proto::RequestAuthenticationExtensions {
+            appid: None,
+            uvm: None,
+            hmac_get_secret: Some(webauthn_rs_proto::HmacGetSecretInput {
+                output1: vec![1u8; 8].into(), // too short
+                output2: None,
+            }),
+        };
+        assert!(convert_request_authentication_extensions(Some(ext)).is_err());
+    }
+
+    #[test]
+    fn convert_request_registration_extensions_maps_cred_protect_and_hmac() {
+        let ext = webauthn_rs_proto::RequestRegistrationExtensions {
+            cred_protect: Some(webauthn_rs_proto::CredProtect {
+                credential_protection_policy:
+                    webauthn_rs_proto::CredentialProtectionPolicy::UserVerificationRequired,
+                enforce_credential_protection_policy: Some(true),
+            }),
+            uvm: None,
+            cred_props: Some(true),
+            min_pin_length: Some(true),
+            hmac_create_secret: Some(true),
+        };
+        let out = convert_request_registration_extensions(Some(ext));
+        assert_eq!(out.cred_props, Some(true));
+        assert_eq!(out.min_pin_length, Some(true));
+        assert_eq!(out.hmac_create_secret, Some(true));
+        assert_eq!(
+            out.credential_protection_policy,
+            Some(CredentialProtectionPolicy::UserVerificationRequired)
+        );
+        assert_eq!(out.enforce_credential_protection_policy, Some(true));
+    }
+
+    #[test]
+    fn convert_request_registration_extensions_defaults_when_none() {
+        let out = convert_request_registration_extensions(None);
+        assert!(out.hmac_create_secret.is_none());
+        assert!(out.credential_protection_policy.is_none());
+    }
+
+    #[test]
+    fn convert_credential_protection_policy_maps_all_variants() {
+        use webauthn_rs_proto::CredentialProtectionPolicy as P;
+        assert_eq!(
+            convert_credential_protection_policy(P::UserVerificationOptional),
+            CredentialProtectionPolicy::UserVerificationOptional
+        );
+        assert_eq!(
+            convert_credential_protection_policy(P::UserVerificationOptionalWithCredentialIDList),
+            CredentialProtectionPolicy::UserVerificationOptionalWithCredentialIDList
+        );
+        assert_eq!(
+            convert_credential_protection_policy(P::UserVerificationRequired),
+            CredentialProtectionPolicy::UserVerificationRequired
+        );
+    }
+
+    #[test]
+    fn convert_response_registration_extensions_maps_hmac_and_cred_props() {
+        let outputs = AuthenticationExtensionsClientOutputs {
+            app_id: Some(true),
+            hmac_create_secret: Some(true),
+            cred_props: Some(authenticator::ctap2::server::CredentialProperties { rk: true }),
+            ..Default::default()
+        };
+        let out = convert_response_registration_extensions(outputs);
+        assert_eq!(out.appid, Some(true));
+        assert_eq!(out.hmac_secret, Some(true));
+        assert_eq!(out.cred_props.map(|c| c.rk), Some(Some(true)));
+    }
+
+    #[test]
+    fn convert_response_authentication_extensions_maps_hmac_outputs() {
+        let outputs = AuthenticationExtensionsClientOutputs {
+            app_id: Some(false),
+            hmac_get_secret: Some(authenticator::ctap2::server::HMACGetSecretOutput {
+                output1: [3u8; 32],
+                output2: Some([4u8; 32]),
+            }),
+            ..Default::default()
+        };
+        let out = convert_response_authentication_extensions(outputs);
+        assert_eq!(out.appid, Some(false));
+        let hmac = out.hmac_get_secret.unwrap();
+        assert_eq!(hmac.output1.as_slice(), &[3u8; 32]);
+        assert_eq!(hmac.output2.unwrap().as_slice(), &[4u8; 32]);
+    }
+}

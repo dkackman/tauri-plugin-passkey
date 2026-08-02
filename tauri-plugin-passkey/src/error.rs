@@ -46,3 +46,40 @@ impl Serialize for Error {
         serializer.serialize_str(self.to_string().as_ref())
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // The webview receives errors as a JSON string, not a tagged object: the
+    // custom Serialize impl flattens each variant to its Display text. These
+    // tests pin that contract (and the Display formats) since the frontend has
+    // nothing else to match on.
+    #[test]
+    fn serializes_to_a_bare_display_string() {
+        let json = serde_json::to_string(&Error::Validation("bad rp_id".to_string())).unwrap();
+        assert_eq!(json, "\"Validation error: bad rp_id\"");
+    }
+
+    #[test]
+    fn authenticator_error_uses_its_display_text() {
+        let json =
+            serde_json::to_string(&Error::Authenticator("no credential id".to_string())).unwrap();
+        assert_eq!(json, "\"Authenticator error: no credential id\"");
+    }
+
+    #[test]
+    fn unit_variant_serializes_to_its_message() {
+        let json = serde_json::to_string(&Error::NoToken).unwrap();
+        assert_eq!(json, "\"No token found\"");
+    }
+
+    #[test]
+    fn serialized_error_is_a_json_string_not_an_object() {
+        // Regression guard: a derived Serialize would emit {"Validation": ...};
+        // the frontend contract depends on it being a plain string.
+        let value: serde_json::Value =
+            serde_json::to_value(Error::Validation("x".to_string())).unwrap();
+        assert!(value.is_string());
+    }
+}

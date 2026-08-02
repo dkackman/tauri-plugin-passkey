@@ -78,6 +78,7 @@ Required before any Android Gradle task or iOS Xcode build/test.
 pnpm install
 pnpm build        # pnpm -r build, dependency order (dist-js before test-app)
 pnpm test         # pnpm -r test
+pnpm test:js      # vitest (guest-js API contract tests; mocks @tauri-apps/api)
 pnpm test:rust    # cargo test (macOS: use scripts/test-macos.sh for the right toolchain)
 pnpm test:swift   # materializes iOS deps, then xcodebuild test
 pnpm test:android # ./gradlew test (needs materialize-tauri-android.sh first)

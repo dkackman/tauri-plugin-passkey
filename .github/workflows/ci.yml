@@ -97,6 +97,9 @@ jobs:
       - name: Build TypeScript
         run: pnpm build
 
+      - name: Run JS tests
+        run: pnpm test:js
+
       # Catches the beta.5 failure mode: the build succeeds but emits declarations
       # to a path package.json does not point at, so the published package has no
       # resolvable types. Only a tarball listing reveals it.

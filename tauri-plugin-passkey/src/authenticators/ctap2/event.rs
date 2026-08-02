@@ -88,3 +88,139 @@ impl From<StatusPinUv> for PinEvent {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::sync::mpsc::channel;
+
+    #[test]
+    fn select_key_user_encodes_id_as_unpadded_base64url() {
+        let user = PublicKeyCredentialUserEntity {
+            id: vec![1, 2, 3],
+            name: Some("alice".to_string()),
+            display_name: Some("Alice".to_string()),
+        };
+        let sk: SelectKeyUser = user.into();
+        assert_eq!(sk.id, "AQID");
+        assert_eq!(sk.name.as_deref(), Some("alice"));
+        assert_eq!(sk.display_name.as_deref(), Some("Alice"));
+    }
+
+    #[test]
+    fn from_status_maps_simple_notices() {
+        assert!(matches!(
+            WebauthnEvent::from_status(StatusUpdate::SelectDeviceNotice),
+            Some(WebauthnEvent::SelectDevice)
+        ));
+        assert!(matches!(
+            WebauthnEvent::from_status(StatusUpdate::PresenceRequired),
+            Some(WebauthnEvent::PresenceRequired)
+        ));
+    }
+
+    #[test]
+    fn from_status_wraps_pin_errors() {
+        let ev = WebauthnEvent::from_status(StatusUpdate::PinUvError(StatusPinUv::PinIsTooShort));
+        assert!(matches!(
+            ev,
+            Some(WebauthnEvent::PinEvent {
+                event: PinEvent::PinIsTooShort
+            })
+        ));
+    }
+
+    #[test]
+    fn from_status_maps_select_result_to_keys() {
+        let (tx, _rx) = channel::<Option<usize>>();
+        let users = vec![PublicKeyCredentialUserEntity {
+            id: vec![4, 5, 6],
+            name: None,
+            display_name: None,
+        }];
+        let ev = WebauthnEvent::from_status(StatusUpdate::SelectResultNotice(tx, users));
+        match ev {
+            Some(WebauthnEvent::SelectKey { keys }) => {
+                assert_eq!(keys.len(), 1);
+                assert_eq!(keys[0].id, "BAUG");
+            }
+            other => panic!("unexpected event: {other:?}"),
+        }
+    }
+
+    #[test]
+    fn pin_event_maps_variants_carrying_attempt_counts() {
+        let (tx, _rx) = channel::<authenticator::Pin>();
+        let ev: PinEvent = StatusPinUv::InvalidPin(tx, Some(2)).into();
+        assert!(matches!(
+            ev,
+            PinEvent::InvalidPin {
+                attempts_remaining: Some(2)
+            }
+        ));
+
+        let ev: PinEvent = StatusPinUv::InvalidUv(Some(1)).into();
+        assert!(matches!(
+            ev,
+            PinEvent::InvalidUv {
+                attempts_remaining: Some(1)
+            }
+        ));
+
+        let ev: PinEvent = StatusPinUv::PinIsTooLong(10).into();
+        assert!(matches!(ev, PinEvent::PinIsTooLong { max_length: 10 }));
+    }
+
+    #[test]
+    fn pin_event_maps_unit_variants() {
+        let (tx, _rx) = channel::<authenticator::Pin>();
+        assert!(matches!(
+            PinEvent::from(StatusPinUv::PinRequired(tx)),
+            PinEvent::PinRequired
+        ));
+        assert!(matches!(
+            PinEvent::from(StatusPinUv::PinAuthBlocked),
+            PinEvent::PinAuthBlocked
+        ));
+        assert!(matches!(
+            PinEvent::from(StatusPinUv::PinBlocked),
+            PinEvent::PinBlocked
+        ));
+        assert!(matches!(
+            PinEvent::from(StatusPinUv::UvBlocked),
+            PinEvent::UvBlocked
+        ));
+        assert!(matches!(
+            PinEvent::from(StatusPinUv::PinNotSet),
+            PinEvent::PinNotSet
+        ));
+    }
+
+    #[test]
+    fn webauthn_event_serializes_with_camelcase_type_tag() {
+        // The frontend TS `WebauthnEventType`/`PinEventType` enums match on these
+        // exact strings, so the serde shape is a cross-language contract.
+        let json = serde_json::to_value(WebauthnEvent::PresenceRequired).unwrap();
+        assert_eq!(json, serde_json::json!({ "type": "presenceRequired" }));
+
+        let json = serde_json::to_value(WebauthnEvent::PinEvent {
+            event: PinEvent::PinRequired,
+        })
+        .unwrap();
+        assert_eq!(
+            json,
+            serde_json::json!({ "type": "pinEvent", "event": { "type": "pinRequired" } })
+        );
+    }
+
+    #[test]
+    fn select_key_user_skips_absent_optional_fields() {
+        let json = serde_json::to_value(SelectKeyUser {
+            id: "AQID".to_string(),
+            name: None,
+            display_name: None,
+        })
+        .unwrap();
+        assert_eq!(json, serde_json::json!({ "id": "AQID" }));
+    }
+}

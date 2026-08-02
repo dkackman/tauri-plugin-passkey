@@ -7,6 +7,7 @@
     "build": "pnpm -r build",
     "install:all": "pnpm install",
     "test": "pnpm -r test",
+    "test:js": "cd tauri-plugin-passkey && pnpm test:js",
     "test:rust": "cd tauri-plugin-passkey && cargo test",
     "test:swift": "cd tauri-plugin-passkey && ./scripts/materialize-tauri-ios.sh && cd ios && xcodebuild test -scheme tauri-plugin-passkey -destination 'platform=iOS Simulator,name=iPhone 17'",
     "test:android": "cd tauri-plugin-passkey/android && (./gradlew test || gradle test || echo 'Note: Gradle wrapper not found. Install Gradle or run from Android Studio')",

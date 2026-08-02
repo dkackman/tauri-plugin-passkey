@@ -358,3 +358,148 @@ fn base64_url_encode(input: &[u8]) -> String {
     use base64::Engine;
     URL_SAFE_NO_PAD.encode(input)
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn base64_url_round_trips() {
+        let bytes = [0u8, 1, 2, 250, 251, 252, 253, 254, 255];
+        let encoded = base64_url_encode(&bytes);
+        // URL-safe, unpadded: no '+', '/', or '=' may appear.
+        assert!(!encoded.contains('+') && !encoded.contains('/') && !encoded.contains('='));
+        assert_eq!(base64_url_decode(&encoded).unwrap(), bytes);
+    }
+
+    #[test]
+    fn base64_url_decode_rejects_invalid_input() {
+        assert!(base64_url_decode("not valid base64!!!").is_err());
+    }
+
+    #[test]
+    fn json_bytes_reports_the_missing_field_name() {
+        let v: serde_json::Value = serde_json::from_str(r#"{"present":"AQID"}"#).unwrap();
+        let err = json_bytes(&v, "absent").unwrap_err();
+        assert!(err.to_string().contains("Missing JSON field: absent"));
+    }
+
+    #[test]
+    fn parses_registration_response_with_prf_enabled() {
+        let raw_id = [1u8, 2, 3, 4];
+        let att = [10u8, 20, 30];
+        let cdj = [40u8, 50, 60];
+        let json = format!(
+            r#"{{"id":"credA","rawId":"{}","response":{{"attestationObject":"{}","clientDataJSON":"{}"}},"prf":{{"enabled":true}}}}"#,
+            base64_url_encode(&raw_id),
+            base64_url_encode(&att),
+            base64_url_encode(&cdj),
+        );
+
+        let parsed = parse_registration_response(&json).unwrap();
+
+        assert_eq!(parsed.id, "credA");
+        assert_eq!(parsed.raw_id.as_slice(), &raw_id);
+        assert_eq!(parsed.response.attestation_object.as_slice(), &att);
+        assert_eq!(parsed.response.client_data_json.as_slice(), &cdj);
+        assert_eq!(parsed.type_, "public-key");
+        assert_eq!(parsed.extensions.hmac_secret, Some(true));
+    }
+
+    #[test]
+    fn parses_registration_response_without_prf() {
+        let json = format!(
+            r#"{{"id":"credB","rawId":"{}","response":{{"attestationObject":"{}","clientDataJSON":"{}"}}}}"#,
+            base64_url_encode(&[1u8]),
+            base64_url_encode(&[2u8]),
+            base64_url_encode(&[3u8]),
+        );
+
+        let parsed = parse_registration_response(&json).unwrap();
+
+        assert_eq!(parsed.extensions.hmac_secret, None);
+    }
+
+    #[test]
+    fn registration_response_missing_id_is_an_error() {
+        let json = format!(
+            r#"{{"rawId":"{}","response":{{"attestationObject":"{}","clientDataJSON":"{}"}}}}"#,
+            base64_url_encode(&[1u8]),
+            base64_url_encode(&[2u8]),
+            base64_url_encode(&[3u8]),
+        );
+
+        let err = parse_registration_response(&json).unwrap_err();
+        assert!(err.to_string().contains("Missing JSON field: id"));
+    }
+
+    #[test]
+    fn parses_authentication_response_with_both_prf_outputs() {
+        let raw_id = [9u8, 8, 7];
+        let auth_data = [1u8, 1, 1];
+        let cdj = [2u8, 2, 2];
+        let sig = [3u8, 3, 3];
+        let user_handle = [4u8, 4, 4];
+        let prf_first = [5u8; 32];
+        let prf_second = [6u8; 32];
+        let json = format!(
+            r#"{{"id":"credC","rawId":"{}","response":{{"authenticatorData":"{}","clientDataJSON":"{}","signature":"{}","userHandle":"{}"}},"prf":{{"first":"{}","second":"{}"}}}}"#,
+            base64_url_encode(&raw_id),
+            base64_url_encode(&auth_data),
+            base64_url_encode(&cdj),
+            base64_url_encode(&sig),
+            base64_url_encode(&user_handle),
+            base64_url_encode(&prf_first),
+            base64_url_encode(&prf_second),
+        );
+
+        let parsed = parse_authentication_response(&json).unwrap();
+
+        assert_eq!(parsed.id, "credC");
+        assert_eq!(parsed.raw_id.as_slice(), &raw_id);
+        assert_eq!(parsed.response.signature.as_slice(), &sig);
+        assert_eq!(
+            parsed.response.user_handle.as_ref().unwrap().as_slice(),
+            &user_handle
+        );
+        let hmac = parsed.extensions.hmac_get_secret.unwrap();
+        assert_eq!(hmac.output1.as_slice(), &prf_first);
+        assert_eq!(hmac.output2.unwrap().as_slice(), &prf_second);
+    }
+
+    #[test]
+    fn authentication_response_prf_second_is_optional() {
+        let prf_first = [7u8; 32];
+        let json = format!(
+            r#"{{"id":"credD","rawId":"{}","response":{{"authenticatorData":"{}","clientDataJSON":"{}","signature":"{}"}},"prf":{{"first":"{}"}}}}"#,
+            base64_url_encode(&[1u8]),
+            base64_url_encode(&[2u8]),
+            base64_url_encode(&[3u8]),
+            base64_url_encode(&[4u8]),
+            base64_url_encode(&prf_first),
+        );
+
+        let parsed = parse_authentication_response(&json).unwrap();
+
+        // No userHandle in the JSON -> None.
+        assert!(parsed.response.user_handle.is_none());
+        let hmac = parsed.extensions.hmac_get_secret.unwrap();
+        assert_eq!(hmac.output1.as_slice(), &prf_first);
+        assert!(hmac.output2.is_none());
+    }
+
+    #[test]
+    fn authentication_response_without_prf_has_no_hmac_output() {
+        let json = format!(
+            r#"{{"id":"credE","rawId":"{}","response":{{"authenticatorData":"{}","clientDataJSON":"{}","signature":"{}"}}}}"#,
+            base64_url_encode(&[1u8]),
+            base64_url_encode(&[2u8]),
+            base64_url_encode(&[3u8]),
+            base64_url_encode(&[4u8]),
+        );
+
+        let parsed = parse_authentication_response(&json).unwrap();
+
+        assert!(parsed.extensions.hmac_get_secret.is_none());
+    }
+}
