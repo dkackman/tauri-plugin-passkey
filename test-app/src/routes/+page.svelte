@@ -440,7 +440,7 @@
     <div class="action-group">
       <h3>Cancel</h3>
       <div class="row">
-        <button onclick={() => cancel()} disabled={!busy}>Cancel</button>
+        <button type="button" onclick={() => cancel()} disabled={!busy}>Cancel</button>
       </div>
     </div>
   </section>

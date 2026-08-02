@@ -27,7 +27,7 @@ A `keystore.properties` file in the `src-tauri/gen/android` directory is require
 
 Your app must be verified against your relying-party domain via [Digital Asset Links](https://developer.android.com/identity/sign-in/credential-manager#add-support-dal), or Credential Manager will refuse to create or use passkeys for that domain.
 
-Serve a `assetlinks.json` file at `https://<rp-domain>/.well-known/assetlinks.json` listing your app's package name and the SHA-256 fingerprint of your signing certificate. You can generate the file with Google's [Digital Asset Links generator](https://developers.google.com/digital-asset-links/tools/generator).
+Serve an `assetlinks.json` file at `https://<rp-domain>/.well-known/assetlinks.json` listing your app's package name and the SHA-256 fingerprint of your signing certificate. You can generate the file with Google's [Digital Asset Links generator](https://developers.google.com/digital-asset-links/tools/generator).
 
 Reference this file from your app manifest at `src-tauri/gen/android/app/src/main/AndroidManifest.xml`:
 
@@ -43,7 +43,7 @@ and define the string resource in `src-tauri/gen/android/app/src/main/res/values
 <resources>
     <string name="asset_statements" translatable="false">
     [{
-    "include": "https://your.domain.com/.well-known/assetlinks.json"
+    \"include\": \"https://your.domain.com/.well-known/assetlinks.json\"
     }]
     </string>
 </resources>
