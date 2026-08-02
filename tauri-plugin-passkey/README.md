@@ -116,6 +116,14 @@ These are no-ops on other platforms — safe to wire unconditionally.
 
 A complete relying-party + frontend example (including PRF, discoverable and non-discoverable flows) lives in [`test-app/`](https://github.com/dkackman/tauri-plugin-passkey/tree/main/test-app).
 
+## Acknowledgments
+
+This project is a derivative of [`tauri-plugin-webauthn`](https://github.com/Profiidev/tauri-plugin-webauthn)
+by [ProfiiDev](https://github.com/Profiidev), itself originally forked from
+[fendent/tauri-plugin-webauthn](https://github.com/fendent/tauri-plugin-webauthn). See the
+[repository's NOTICE file](https://github.com/dkackman/tauri-plugin-passkey/blob/main/NOTICE)
+for full attribution.
+
 ## License
 
 MIT OR Apache-2.0

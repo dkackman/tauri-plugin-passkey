@@ -115,6 +115,14 @@ To report a vulnerability, see [SECURITY.md](SECURITY.md).
 
 MIT OR Apache-2.0
 
+## Acknowledgments
+
+This project is a derivative of [`tauri-plugin-webauthn`](https://github.com/Profiidev/tauri-plugin-webauthn)
+by [ProfiiDev](https://github.com/Profiidev), itself originally forked from
+[fendent/tauri-plugin-webauthn](https://github.com/fendent/tauri-plugin-webauthn). See
+[NOTICE](NOTICE) for full attribution and [LICENSE-MIT](LICENSE-MIT) for the retained
+original copyright notices.
+
 ## Contributing
 
 Contributions are welcome! Please feel free to submit a Pull Request.
@@ -124,3 +132,4 @@ Contributions are welcome! Please feel free to submit a Pull Request.
 - [Plugin documentation](tauri-plugin-passkey/README.md)
 - [Repository](https://github.com/dkackman/tauri-plugin-passkey)
 - [Issues](https://github.com/dkackman/tauri-plugin-passkey/issues)
+- [Upstream: Profiidev/tauri-plugin-webauthn](https://github.com/Profiidev/tauri-plugin-webauthn)
