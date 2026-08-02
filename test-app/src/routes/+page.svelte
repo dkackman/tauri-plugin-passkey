@@ -8,6 +8,8 @@
   import {
     register,
     authenticate,
+    cancel,
+    isPasskeyError,
     registerListener,
     PasskeyEventType,
     sendPin,
@@ -97,7 +99,10 @@
       showSettings = false;
       log('success', `RP config updated: ${rpId} (${rpOrigin})`);
     } catch (e: any) {
-      log('error', `Failed to update RP config: ${e?.message ?? e}`);
+      log(
+        'error',
+        `Failed to update RP config: ${isPasskeyError(e) ? `${e.kind}: ${e.message}` : String(e)}`
+      );
     }
   }
 
@@ -136,7 +141,10 @@
       await invoke('reg_finish', { response });
       log('success', `Registration successful for "${name}"!`);
     } catch (e: any) {
-      log('error', `Registration failed: ${e?.message ?? e}`);
+      log(
+        'error',
+        `Registration failed: ${isPasskeyError(e) ? `${e.kind}: ${e.message}` : String(e)}`
+      );
     } finally {
       busy = false;
       needsPin = false;
@@ -164,7 +172,10 @@
       }
       log('success', 'Authentication successful!');
     } catch (e: any) {
-      log('error', `Authentication failed: ${e?.message ?? e}`);
+      log(
+        'error',
+        `Authentication failed: ${isPasskeyError(e) ? `${e.kind}: ${e.message}` : String(e)}`
+      );
     } finally {
       busy = false;
       needsPin = false;
@@ -196,7 +207,10 @@
       }
       log('success', 'Authentication successful!');
     } catch (e: any) {
-      log('error', `Authentication failed: ${e?.message ?? e}`);
+      log(
+        'error',
+        `Authentication failed: ${isPasskeyError(e) ? `${e.kind}: ${e.message}` : String(e)}`
+      );
     } finally {
       busy = false;
       needsPin = false;
@@ -215,7 +229,10 @@
       pin = '';
       needsPin = false;
     } catch (e: any) {
-      log('error', `Failed to send PIN: ${e?.message ?? e}`);
+      log(
+        'error',
+        `Failed to send PIN: ${isPasskeyError(e) ? `${e.kind}: ${e.message}` : String(e)}`
+      );
     }
   };
 
@@ -418,6 +435,13 @@
         >
         <button type="submit" disabled={busy}>Authenticate</button>
       </form>
+    </div>
+
+    <div class="action-group">
+      <h3>Cancel</h3>
+      <div class="row">
+        <button onclick={() => cancel()} disabled={!busy}>Cancel</button>
+      </div>
     </div>
   </section>
 

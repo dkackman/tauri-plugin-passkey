@@ -43,6 +43,13 @@ fn rp_origin() -> String {
   env::var("WEBAUTHN_RP_ORIGIN").unwrap_or_else(|_| DEFAULT_RP_ORIGIN.to_string())
 }
 
+// The APK signing-cert hash differs per developer keystore. Override with
+// PASSKEY_APK_KEY_HASH; the default matches this repo's debug keystore only.
+fn apk_key_hash() -> String {
+  env::var("PASSKEY_APK_KEY_HASH")
+    .unwrap_or_else(|_| "android:apk-key-hash:W8LAR3CdJ3CAVCTuv3_J5fF2iKYGYQhYfKq9ANbOzjI".to_string())
+}
+
 #[derive(Clone, Serialize, Deserialize)]
 struct RpConfig {
   rp_id: String,
@@ -104,7 +111,7 @@ fn build_webauthn(rp_id: &str, rp_origin: &str) -> Result<Webauthn, String> {
   let url = Url::parse(rp_origin).log_err("Invalid RP origin URL")?;
   let mut builder =
     WebauthnBuilder::new(rp_id, &url).log_err("Failed to create WebauthnBuilder")?;
-  let android_origin = format!("android:apk-key-hash:W8LAR3CdJ3CAVCTuv3_J5fF2iKYGYQhYfKq9ANbOzjI");
+  let android_origin = apk_key_hash();
   builder = builder.append_allowed_origin(
     &Url::parse(&android_origin).log_err("Invalid Android APK key hash URL")?,
   );

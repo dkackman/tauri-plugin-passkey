@@ -1,6 +1,8 @@
 # WebAuthn Example App
 
-A Tauri + SvelteKit example demonstrating the `tauri-plugin-passkey` plugin across macOS, iOS, and Android.
+A Tauri + SvelteKit example demonstrating the `tauri-plugin-passkey` plugin across
+macOS, iOS, Android, Windows, and Linux. The PIN-entry and key-selection UI only
+activates on Linux; other platforms use native OS dialogs for those steps.
 
 ## Prerequisites
 
@@ -163,7 +165,8 @@ pnpm tauri ios dev --open
 
 ## Notes
 
-- Credentials are stored in memory and will be lost when the app restarts.
+- Registered credentials are persisted to `passkey-store.json` in the app data
+  directory, so they survive restarts. Delete that file to reset the demo state.
 - The in-app console shows color-coded log entries for registration/authentication flow.
 
 ## Recommended IDE Setup
