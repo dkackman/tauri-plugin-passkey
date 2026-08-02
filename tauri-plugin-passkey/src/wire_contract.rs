@@ -2,7 +2,6 @@
 //! The shapes here are what guest-js/index.ts sends (standard WebAuthn JSON,
 //! base64url-encoded binary fields). If a webauthn-rs-proto upgrade breaks
 //! these tests, the JS<->Rust contract broke: audit before bumping.
-#![cfg(test)]
 
 use webauthn_rs_proto::{PublicKeyCredentialCreationOptions, PublicKeyCredentialRequestOptions};
 
