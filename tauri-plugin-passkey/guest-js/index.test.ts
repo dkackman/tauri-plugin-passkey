@@ -18,10 +18,10 @@ import {
   cancel,
   registerListener,
   EVENT_NAME,
-  WebauthnEventType,
+  PasskeyEventType,
   PinEventType,
   isPasskeyError,
-  type WebauthnEvent,
+  type PasskeyEvent,
 } from "./index";
 
 beforeEach(() => {
@@ -66,6 +66,36 @@ describe("authenticate", () => {
       options,
     });
     expect(result).toBe(expected);
+  });
+});
+
+describe("timeout option", () => {
+  it("passes timeout through to register", async () => {
+    const options = { challenge: "abc" } as unknown as Parameters<
+      typeof register
+    >[1];
+
+    await register("https://example.com", options, 30_000);
+
+    expect(invoke).toHaveBeenCalledWith("plugin:passkey|register", {
+      origin: "https://example.com",
+      options,
+      timeout: 30_000,
+    });
+  });
+
+  it("omits timeout from authenticate when not given", async () => {
+    const options = { challenge: "def" } as unknown as Parameters<
+      typeof authenticate
+    >[1];
+
+    await authenticate("https://example.com", options);
+
+    expect(invoke).toHaveBeenCalledWith("plugin:passkey|authenticate", {
+      origin: "https://example.com",
+      options,
+      timeout: undefined,
+    });
   });
 });
 
@@ -117,7 +147,7 @@ describe("registerListener", () => {
     expect(listen.mock.calls[0][0]).toBe(EVENT_NAME);
     expect(returned).toBe(unlisten);
 
-    const payload: WebauthnEvent = { type: WebauthnEventType.SelectDevice };
+    const payload: PasskeyEvent = { type: PasskeyEventType.SelectDevice };
     captured?.({ payload });
 
     expect(userListener).toHaveBeenCalledWith(payload);
@@ -129,11 +159,11 @@ describe("constants and enums", () => {
     expect(EVENT_NAME).toBe("tauri-plugin-passkey");
   });
 
-  it("keeps WebauthnEventType values in sync with the Rust camelCase serde tags", () => {
-    expect(WebauthnEventType.SelectDevice).toBe("selectDevice");
-    expect(WebauthnEventType.PresenceRequired).toBe("presenceRequired");
-    expect(WebauthnEventType.PinEvent).toBe("pinEvent");
-    expect(WebauthnEventType.SelectKey).toBe("selectKey");
+  it("keeps PasskeyEventType values in sync with the Rust camelCase serde tags", () => {
+    expect(PasskeyEventType.SelectDevice).toBe("selectDevice");
+    expect(PasskeyEventType.PresenceRequired).toBe("presenceRequired");
+    expect(PasskeyEventType.PinEvent).toBe("pinEvent");
+    expect(PasskeyEventType.SelectKey).toBe("selectKey");
   });
 
   it("keeps PinEventType values in sync with the Rust camelCase serde tags", () => {

@@ -9,7 +9,7 @@
     register,
     authenticate,
     registerListener,
-    WebauthnEventType,
+    PasskeyEventType,
     sendPin,
     PinEventType,
     selectKey
@@ -224,16 +224,16 @@
     log('info', `WebAuthn example ready. RP: ${rpId} (${rpOrigin})`);
     registerListener((event) => {
       switch (event.type) {
-        case WebauthnEventType.SelectDevice:
+        case PasskeyEventType.SelectDevice:
           log(
             'action',
             'Multiple devices found. Touch the one you want to use.'
           );
           break;
-        case WebauthnEventType.PresenceRequired:
+        case PasskeyEventType.PresenceRequired:
           log('action', 'Touch your authenticator to confirm.');
           break;
-        case WebauthnEventType.PinEvent:
+        case PasskeyEventType.PinEvent:
           switch (event.event.type) {
             case PinEventType.PinRequired:
               needsPin = true;
@@ -268,7 +268,7 @@
               break;
           }
           break;
-        case WebauthnEventType.SelectKey:
+        case PasskeyEventType.SelectKey:
           keys = event.keys.map((key) => key.name ?? key.displayName ?? key.id);
           log('action', `${keys.length} keys found. Select one below.`);
           break;

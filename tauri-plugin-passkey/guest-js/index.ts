@@ -11,20 +11,20 @@ import { listen, UnlistenFn } from "@tauri-apps/api/event";
 export type PublicKeyCredentialJSON =
   RegistrationResponseJSON | AuthenticationResponseJSON;
 
-export type WebauthnEvent =
+export type PasskeyEvent =
   | {
-      type: WebauthnEventType.SelectDevice | WebauthnEventType.PresenceRequired;
+      type: PasskeyEventType.SelectDevice | PasskeyEventType.PresenceRequired;
     }
   | {
-      type: WebauthnEventType.PinEvent;
+      type: PasskeyEventType.PinEvent;
       event: PinEvent;
     }
   | {
-      type: WebauthnEventType.SelectKey;
+      type: PasskeyEventType.SelectKey;
       keys: AuthKey[];
     };
 
-export enum WebauthnEventType {
+export enum PasskeyEventType {
   SelectDevice = "selectDevice",
   PresenceRequired = "presenceRequired",
   PinEvent = "pinEvent",
@@ -107,15 +107,18 @@ export const EVENT_NAME = "tauri-plugin-passkey";
  *
  * @param origin The origin of the request. This is used to verify the request.
  * @param options The webauthn options. This is used to create the request.
+ * @param timeout Optional timeout in milliseconds. Defaults to 60000 on the Rust side.
  * @returns A promise that resolves to the registration response.
  */
 export async function register(
   origin: string,
-  options: PublicKeyCredentialCreationOptionsJSON
+  options: PublicKeyCredentialCreationOptionsJSON,
+  timeout?: number
 ): Promise<RegistrationResponseJSON> {
   return await invoke<RegistrationResponseJSON>("plugin:passkey|register", {
     origin,
     options,
+    timeout,
   });
 }
 
@@ -124,15 +127,18 @@ export async function register(
  *
  * @param origin The origin of the request. This is used to verify the request.
  * @param options The webauthn options. This is used to create the request.
+ * @param timeout Optional timeout in milliseconds. Defaults to 60000 on the Rust side.
  * @returns A promise that resolves to the authentication response.
  */
 export async function authenticate(
   origin: string,
-  options: PublicKeyCredentialRequestOptionsJSON
+  options: PublicKeyCredentialRequestOptionsJSON,
+  timeout?: number
 ): Promise<PublicKeyCredentialJSON> {
   return await invoke<PublicKeyCredentialJSON>("plugin:passkey|authenticate", {
     origin,
     options,
+    timeout,
   });
 }
 
@@ -150,11 +156,11 @@ export async function sendPin(pin: string): Promise<void> {
 }
 
 /**
- * Select a key from the list of keys received by the `selectKey` event.
- * Does nothing on windows and mobile.
+ * Select a key from the list delivered by the `selectKey` event.
+ * Only meaningful on Linux; does nothing on Windows and mobile.
  *
- * @param uv The uv to send to the authenticator.
- * @returns A promise that resolves when the uv has been sent.
+ * @param index The zero-based index into the `keys` array of the `selectKey` event.
+ * @returns A promise that resolves once the selection has been sent.
  */
 export async function selectKey(index: number): Promise<void> {
   return await invoke("plugin:passkey|select_key", {
@@ -173,16 +179,16 @@ export async function cancel(): Promise<void> {
 }
 
 /**
- * Creates a listener for the webauthn events.
+ * Creates a listener for plugin events.
  * Events are only emitted on Linux; other platforms show native UI instead.
  *
  * @param listener The listener to call when the event is triggered.
  * @returns A promise that resolves to a function that can be used to unregister the listener.
  */
 export async function registerListener(
-  listener: (event: WebauthnEvent) => void
+  listener: (event: PasskeyEvent) => void
 ): Promise<UnlistenFn> {
   return listen(EVENT_NAME, (event) => {
-    listener(event.payload as WebauthnEvent);
+    listener(event.payload as PasskeyEvent);
   });
 }
