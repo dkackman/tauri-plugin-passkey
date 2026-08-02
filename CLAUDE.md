@@ -99,6 +99,21 @@ pnpm tauri dev              # Windows/Linux
 open src-tauri/target/debug/bundle/macos/test-app.app
 ```
 
+On NDK r23+ (r29 confirmed) the Android build fails while cross-compiling the test app's
+vendored OpenSSL with `aarch64-linux-android-ranlib: command not found` — the NDK dropped
+the target-prefixed binutils wrappers and ships only the `llvm-` ones. Point the openssl
+build at those:
+
+```bash
+NDKBIN="$NDK_HOME/toolchains/llvm/prebuilt/darwin-x86_64/bin"   # linux-x86_64 on Linux
+PATH="$NDKBIN:$PATH" \
+  AR_aarch64_linux_android=llvm-ar RANLIB_aarch64_linux_android=llvm-ranlib \
+  pnpm tauri android build --debug --target aarch64
+```
+
+Substitute the matching `AR_<target>` / `RANLIB_<target>` pair for other ABIs. CI is
+unaffected — its Android job runs the plugin's Gradle tests, which never build OpenSSL.
+
 ### Before committing
 
 ```bash

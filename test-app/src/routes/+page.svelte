@@ -1,8 +1,7 @@
 <script lang="ts">
-  import type {
-    PublicKeyCredentialCreationOptionsJSON,
-    PublicKeyCredentialRequestOptionsJSON
-  } from '@simplewebauthn/types';
+  // PublicKeyCredentialCreationOptionsJSON / PublicKeyCredentialRequestOptionsJSON are
+  // standard DOM types, globally available via the TypeScript "dom" lib — no import
+  // needed. The plugin's own API surface declares them the same way.
   import { invoke } from '@tauri-apps/api/core';
   import { onMount } from 'svelte';
   import {
