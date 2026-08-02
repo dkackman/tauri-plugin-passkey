@@ -20,6 +20,7 @@ import {
   EVENT_NAME,
   WebauthnEventType,
   PinEventType,
+  isPasskeyError,
   type WebauthnEvent,
 } from "./index";
 
@@ -145,5 +146,24 @@ describe("constants and enums", () => {
     expect(PinEventType.PinIsTooShort).toBe("pinIsTooShort");
     expect(PinEventType.PinIsTooLong).toBe("pinIsTooLong");
     expect(PinEventType.PinNotSet).toBe("pinNotSet");
+  });
+});
+
+describe("isPasskeyError", () => {
+  it("accepts a tagged error object", () => {
+    expect(
+      isPasskeyError({ kind: "validation", message: "Validation error: bad rp_id" })
+    ).toBe(true);
+  });
+
+  it("rejects strings, null, and objects missing fields", () => {
+    expect(isPasskeyError("Validation error: bad rp_id")).toBe(false);
+    expect(isPasskeyError(null)).toBe(false);
+    expect(isPasskeyError({ kind: "validation" })).toBe(false);
+    expect(isPasskeyError({ message: "x" })).toBe(false);
+  });
+
+  it("accepts unknown future kinds (contract is non-exhaustive)", () => {
+    expect(isPasskeyError({ kind: "somethingNew", message: "x" })).toBe(true);
   });
 });

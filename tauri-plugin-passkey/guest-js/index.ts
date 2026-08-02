@@ -68,6 +68,38 @@ export type AuthKey = {
   displayName?: string;
 };
 
+/**
+ * Known error kinds. The set is non-exhaustive: future minor releases may add
+ * kinds, so treat unknown strings as a generic failure.
+ */
+export type PasskeyErrorKind =
+  | "io"
+  | "platform"
+  | "serialization"
+  | "noToken"
+  | "validation"
+  | "authenticator"
+  | (string & {});
+
+/**
+ * Every rejected plugin promise carries this shape.
+ * `message` is human-readable display text; branch on `kind`.
+ */
+export interface PasskeyError {
+  kind: PasskeyErrorKind;
+  message: string;
+}
+
+/** Type guard for errors thrown by this plugin's commands. */
+export function isPasskeyError(e: unknown): e is PasskeyError {
+  return (
+    typeof e === "object" &&
+    e !== null &&
+    typeof (e as PasskeyError).kind === "string" &&
+    typeof (e as PasskeyError).message === "string"
+  );
+}
+
 export const EVENT_NAME = "tauri-plugin-passkey";
 
 /**
