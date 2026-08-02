@@ -136,16 +136,13 @@ jobs:
       - name: Materialise the Tauri iOS API package
         run: ./scripts/materialize-tauri-ios.sh
 
-      # webauthn has no Swift unit test target (unlike SE's ios/Tests/PluginTests), so
-      # this is a compile check rather than a test run: it proves ios/Sources still
-      # builds against the iOS Simulator SDK. The macOS side of the bridge is
-      # compile+link-checked by the rust-macos job via build.rs and the Swift
-      # @_cdecl exports in macos/Sources/WebauthnBridge/Exports.swift; iOS code is
-      # otherwise only ever built as part of a full host app. The device name is
-      # picked at run time rather than hardcoded, since the exact simulator lineup
-      # available depends on the Xcode version macos-latest ships and changes over
-      # time.
-      - name: Build for iOS Simulator (compile check)
+      # ios/Tests/PluginTests.swift covers the pure logic (base64url, option
+      # decoding, PRF-shape mapping, error descriptions); building the test bundle
+      # also proves ios/Sources still compiles against the iOS Simulator SDK. The
+      # device name is picked at run time rather than hardcoded, since the exact
+      # simulator lineup available depends on the Xcode version macos-latest ships
+      # and changes over time.
+      - name: Run Swift tests (iOS Simulator)
         run: |
           device=$(xcrun simctl list devices available -j | python3 -c "
           import json, sys
@@ -153,11 +150,18 @@ jobs:
           names = [d['name'] for devices in runtimes.values() for d in devices if d['name'].startswith('iPhone')]
           print(names[0])
           ")
-          echo "Building against: $device"
-          xcodebuild build \
+          echo "Testing against: $device"
+          xcodebuild test \
             -scheme tauri-plugin-passkey \
             -destination "platform=iOS Simulator,name=$device"
         working-directory: tauri-plugin-passkey/ios
+
+      # The macOS bridge is a plain SwiftPM package (no UIKit/simulator needed),
+      # so its unit tests run directly on the host. This also compile+links the
+      # @_cdecl exports the Rust macOS backend depends on.
+      - name: Run macOS bridge tests
+        run: swift test
+        working-directory: tauri-plugin-passkey/macos
 
   kotlin:
     name: Kotlin Lint & Tests

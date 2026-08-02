@@ -5,7 +5,7 @@ import UIKit
 
 // MARK: - Decodable argument wrappers
 
-private struct RegistrationOptions: Decodable {
+struct RegistrationOptions: Decodable {
     let rp: RelyingParty
     let user: User
     let challenge: String
@@ -33,7 +33,7 @@ private struct RegistrationOptions: Decodable {
     }
 }
 
-private struct AuthenticationOptions: Decodable {
+struct AuthenticationOptions: Decodable {
     let rpId: String
     let challenge: String
     let allowCredentials: [CredentialDescriptor]?

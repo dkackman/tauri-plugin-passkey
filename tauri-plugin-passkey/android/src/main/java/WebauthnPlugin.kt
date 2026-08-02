@@ -1,6 +1,7 @@
 package net.kackman.webauthn
 
 import android.app.Activity
+import androidx.annotation.VisibleForTesting
 import androidx.credentials.CreatePublicKeyCredentialRequest
 import androidx.credentials.CreatePublicKeyCredentialResponse
 import androidx.credentials.CredentialManager
@@ -114,11 +115,12 @@ class WebauthnPlugin(
         invoke.resolve()
     }
 
-    private companion object {
+    internal companion object {
         // webauthn-rs serializes the PRF extension under its legacy hmac-secret
         // names (`hmacCreateSecret`/`hmacGetSecret`); Credential Manager only
         // understands the standard WebAuthn `prf` key. The iOS/macOS bridges do
         // the equivalent translation into ASAuthorization PRF inputs.
+        @VisibleForTesting
         fun translateRegistrationRequest(requestJson: String): String {
             val request = JSONObject(requestJson)
             val extensions = request.optJSONObject("extensions") ?: return requestJson
@@ -129,6 +131,7 @@ class WebauthnPlugin(
             return request.toString()
         }
 
+        @VisibleForTesting
         fun translateAuthenticationRequest(requestJson: String): String {
             val request = JSONObject(requestJson)
             val extensions = request.optJSONObject("extensions") ?: return requestJson
@@ -149,6 +152,7 @@ class WebauthnPlugin(
         // object — {"enabled": bool} after registration, {"first"/"second":
         // base64url} after authentication — matching what the Swift bridges
         // emit, while Credential Manager nests it under clientExtensionResults.
+        @VisibleForTesting
         fun flattenPrfOutput(responseJson: String): JSObject {
             val response = JSObject(responseJson)
             val prf =

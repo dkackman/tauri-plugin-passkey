@@ -80,8 +80,10 @@ pnpm build        # pnpm -r build, dependency order (dist-js before test-app)
 pnpm test         # pnpm -r test
 pnpm test:js      # vitest (guest-js API contract tests; mocks @tauri-apps/api)
 pnpm test:rust    # cargo test (macOS: use scripts/test-macos.sh for the right toolchain)
-pnpm test:swift   # materializes iOS deps, then xcodebuild test
-pnpm test:android # ./gradlew test (needs materialize-tauri-android.sh first)
+pnpm test:swift   # macOS bridge (swift test) + iOS plugin (materializes iOS deps, xcodebuild test)
+pnpm test:swift:macos # just the macOS WebauthnBridge SwiftPM tests (no simulator needed)
+pnpm test:swift:ios   # just the iOS plugin tests (needs an iOS simulator)
+pnpm test:android # ./gradlew test (Robolectric unit tests; needs materialize-tauri-android.sh first)
 ```
 
 ### Running the test app

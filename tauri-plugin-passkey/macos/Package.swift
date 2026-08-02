@@ -19,5 +19,9 @@ let package = Package(
             name: "WebauthnBridge",
             dependencies: []
         ),
+        .testTarget(
+            name: "WebauthnBridgeTests",
+            dependencies: ["WebauthnBridge"]
+        ),
     ]
 )

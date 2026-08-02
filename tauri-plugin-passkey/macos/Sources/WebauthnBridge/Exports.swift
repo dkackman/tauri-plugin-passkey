@@ -137,7 +137,7 @@ public func webauthnCancel() {
 
 // MARK: - Response serialization
 
-private enum BridgeError: LocalizedError {
+enum BridgeError: LocalizedError {
     case unexpectedCredentialType
     case missingAttestationObject
 
@@ -253,7 +253,7 @@ extension Data {
     }
 }
 
-private func base64URLDecode(_ str: String) -> Data? {
+func base64URLDecode(_ str: String) -> Data? {
     var base64 = str
         .replacingOccurrences(of: "-", with: "+")
         .replacingOccurrences(of: "_", with: "/")
