@@ -38,12 +38,48 @@ pub enum Error {
     Cbor2(#[from] serde_cbor_2::Error),
 }
 
+impl Error {
+    /// Stable, camelCase discriminant sent to the webview. Documented in the
+    /// README as a non-exhaustive set; add new kinds in minor releases only.
+    pub fn kind(&self) -> &'static str {
+        match self {
+            Error::Io(_) => "io",
+            #[cfg(mobile)]
+            Error::PluginInvoke(_) => "platform",
+            #[cfg(all(desktop, windows))]
+            Error::WebAuthn(_) => "platform",
+            Error::SerdeJson(_) => "serialization",
+            Error::NoToken => "noToken",
+            Error::Validation(_) => "validation",
+            Error::Authenticator(_) => "authenticator",
+            #[cfg(not(any(
+                target_os = "android",
+                target_os = "ios",
+                target_os = "windows",
+                target_os = "macos"
+            )))]
+            Error::Ctap2(_) => "authenticator",
+            #[cfg(not(any(
+                target_os = "android",
+                target_os = "ios",
+                target_os = "windows",
+                target_os = "macos"
+            )))]
+            Error::Cbor2(_) => "serialization",
+        }
+    }
+}
+
 impl Serialize for Error {
     fn serialize<S>(&self, serializer: S) -> std::result::Result<S::Ok, S::Error>
     where
         S: Serializer,
     {
-        serializer.serialize_str(self.to_string().as_ref())
+        use serde::ser::SerializeStruct;
+        let mut state = serializer.serialize_struct("Error", 2)?;
+        state.serialize_field("kind", self.kind())?;
+        state.serialize_field("message", &self.to_string())?;
+        state.end()
     }
 }
 
@@ -51,35 +87,46 @@ impl Serialize for Error {
 mod tests {
     use super::*;
 
-    // The webview receives errors as a JSON string, not a tagged object: the
-    // custom Serialize impl flattens each variant to its Display text. These
-    // tests pin that contract (and the Display formats) since the frontend has
-    // nothing else to match on.
+    // The webview receives errors as {"kind": ..., "message": ...}. These tests
+    // pin that contract; the JS PasskeyError type in guest-js/index.ts and the
+    // README's error documentation must stay in sync with it.
     #[test]
-    fn serializes_to_a_bare_display_string() {
-        let json = serde_json::to_string(&Error::Validation("bad rp_id".to_string())).unwrap();
-        assert_eq!(json, "\"Validation error: bad rp_id\"");
+    fn serializes_to_kind_and_message() {
+        let value: serde_json::Value =
+            serde_json::to_value(Error::Validation("bad rp_id".to_string())).unwrap();
+        assert_eq!(value["kind"], "validation");
+        assert_eq!(value["message"], "Validation error: bad rp_id");
     }
 
     #[test]
-    fn authenticator_error_uses_its_display_text() {
-        let json =
-            serde_json::to_string(&Error::Authenticator("no credential id".to_string())).unwrap();
-        assert_eq!(json, "\"Authenticator error: no credential id\"");
+    fn authenticator_error_kind() {
+        let value: serde_json::Value =
+            serde_json::to_value(Error::Authenticator("no credential id".to_string())).unwrap();
+        assert_eq!(value["kind"], "authenticator");
+        assert_eq!(value["message"], "Authenticator error: no credential id");
     }
 
     #[test]
-    fn unit_variant_serializes_to_its_message() {
-        let json = serde_json::to_string(&Error::NoToken).unwrap();
-        assert_eq!(json, "\"No token found\"");
+    fn unit_variant_kind_and_message() {
+        let value: serde_json::Value = serde_json::to_value(Error::NoToken).unwrap();
+        assert_eq!(value["kind"], "noToken");
+        assert_eq!(value["message"], "No token found");
     }
 
     #[test]
-    fn serialized_error_is_a_json_string_not_an_object() {
-        // Regression guard: a derived Serialize would emit {"Validation": ...};
-        // the frontend contract depends on it being a plain string.
+    fn io_and_serde_kinds() {
+        let io = Error::Io(std::io::Error::other("disk on fire"));
+        assert_eq!(io.kind(), "io");
+        let bad_json = serde_json::from_str::<serde_json::Value>("{").unwrap_err();
+        assert_eq!(Error::SerdeJson(bad_json).kind(), "serialization");
+    }
+
+    #[test]
+    fn serialized_error_is_an_object_with_exactly_two_fields() {
         let value: serde_json::Value =
             serde_json::to_value(Error::Validation("x".to_string())).unwrap();
-        assert!(value.is_string());
+        let obj = value.as_object().expect("error must serialize to an object");
+        assert_eq!(obj.len(), 2);
+        assert!(obj.contains_key("kind") && obj.contains_key("message"));
     }
 }
