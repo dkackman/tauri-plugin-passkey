@@ -125,7 +125,9 @@ mod tests {
     fn serialized_error_is_an_object_with_exactly_two_fields() {
         let value: serde_json::Value =
             serde_json::to_value(Error::Validation("x".to_string())).unwrap();
-        let obj = value.as_object().expect("error must serialize to an object");
+        let obj = value
+            .as_object()
+            .expect("error must serialize to an object");
         assert_eq!(obj.len(), 2);
         assert!(obj.contains_key("kind") && obj.contains_key("message"));
     }

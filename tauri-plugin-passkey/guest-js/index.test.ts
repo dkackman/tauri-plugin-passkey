@@ -182,7 +182,10 @@ describe("constants and enums", () => {
 describe("isPasskeyError", () => {
   it("accepts a tagged error object", () => {
     expect(
-      isPasskeyError({ kind: "validation", message: "Validation error: bad rp_id" })
+      isPasskeyError({
+        kind: "validation",
+        message: "Validation error: bad rp_id",
+      })
     ).toBe(true);
   });
 
