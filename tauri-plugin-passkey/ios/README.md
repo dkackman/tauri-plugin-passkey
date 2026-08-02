@@ -157,7 +157,7 @@ pnpm tauri ios dev
 
 This will detect your connected device and build/deploy to it. You will need:
 
-- An iPhone or iPad running iOS 16+
+- An iPhone or iPad running iOS 17.4+
 - The device registered in your Apple Developer account
 - A valid development provisioning profile (Xcode typically manages this automatically)
 
@@ -224,14 +224,14 @@ iOS presents a unified system sheet that lets the user choose between available 
 ## Limitations
 
 - **Simulator**: The iOS Simulator does not support passkey operations. You must use a physical device.
-- **iOS version**: Requires iOS 17.4+. The `ASAuthorizationPlatformPublicKeyCredentialProvider` API was introduced in iOS 15, but the plugin targets iOS 17.4 as the minimum deployment target so the platform authenticator can honor `excludeCredentials` (added to the platform provider in iOS 17.4).
+- **iOS version**: Requires iOS 17.4+. The `ASAuthorizationPlatformPublicKeyCredentialProvider` API predates this, but the plugin targets iOS 17.4 as the minimum deployment target so the platform authenticator can honor `excludeCredentials` (added to the platform provider in iOS 17.4).
 - **Security key transports**: The plugin requests `allSupported` transports for security key credentials. Transport filtering based on the WebAuthn options is not currently implemented.
 
 ## Troubleshooting
 
 | Error                                       | Cause                                                    | Fix                                                                                           |
 | ------------------------------------------- | -------------------------------------------------------- | --------------------------------------------------------------------------------------------- |
-| "WebAuthn requires iOS 15.0 or later"       | Running on an older iOS version                          | Update the device to iOS 16+                                                                  |
+| "WebAuthn requires iOS 17.4 or later"       | Running on an older iOS version                          | Update the device to iOS 17.4+                                                                |
 | "Application not associated with domain X"  | Domain association not validated                         | Check: AASA is hosted, entitlements include the domain, App ID has Associated Domains enabled |
 | "Failed to parse registration options JSON" | Malformed options from the Rust side                     | Verify your server returns valid WebAuthn options with all required fields                    |
 | "Failed to decode base64url fields"         | Invalid base64url encoding in challenge or user ID       | Ensure the server sends properly padded base64url strings                                     |
