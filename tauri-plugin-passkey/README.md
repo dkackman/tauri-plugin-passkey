@@ -1,74 +1,121 @@
-# Tauri Plugin Webauthn
+# Tauri Plugin Passkey
 
-A tauri plugin to interact with the system specific fido2 or webauthn api.
-It is a nearly drop-in replacement for the `@simplewebauthn/browser` package with the only additional requirement being the origin url to pass to the register and authenticate methods.
+WebAuthn / FIDO2 / passkey authentication for Tauri 2 apps on **macOS, iOS, Android, Windows, and Linux**.
 
-| Platform | Supported |
-| -------- | --------- |
-| Linux    | ✓         |
-| Windows  | ✓         |
-| macOS    | ✓         |
-| Android  | ✓         |
-| iOS      | ✓         |
+The plugin talks to each platform's native passkey API (ASAuthorization on Apple platforms, Credential Manager on Android, Windows WebAuthn API, direct CTAP2 on Linux) and exposes one JS API that consumes standard WebAuthn JSON options — the same shapes your relying-party server library (e.g. `webauthn-rs`, `@simplewebauthn/server`) already produces.
 
-## Requirements
+## Platform support
 
-### macOS
+| Capability                          | Linux | macOS 14+       | iOS 17.4+       | Android 9+      | Windows 10 1903+ |
+| ----------------------------------- | ----- | --------------- | --------------- | --------------- | ---------------- |
+| `register` / `authenticate`         | ✅    | ✅              | ✅              | ✅              | ✅               |
+| PRF / hmac-secret extension         | ✅    | ✅              | ✅ (iOS 18+)    | ✅              | ✅               |
+| Credential discovery (usernameless) | ✅    | ✅              | ✅              | ✅              | ❌               |
+| `cancel`                            | ✅    | ✅              | ✅              | ✅              | ❌ (no-op)       |
+| `sendPin` / `selectKey` / events    | ✅    | n/a — native UI | n/a — native UI | n/a — native UI | n/a — native UI  |
 
-macOS support uses Apple's ASAuthorization framework for native passkey and security key authentication. It requires macOS 14+, code signing with Associated Domains entitlements, and a provisioning profile.
+On everything except Linux, the operating system shows its own passkey UI (Touch ID / Face ID / Windows Hello / Android sheet), so PIN entry, device selection, and progress events never reach your app. On Linux the plugin drives a CTAP2 authenticator directly and surfaces those interactions as [events](#events-linux-only).
 
-See [macos/README.md](macos/README.md) for setup instructions.
+## Install
 
-### Android
+```bash
+cargo add tauri-plugin-passkey            # in src-tauri/
+pnpm add tauri-plugin-passkey-api         # in your frontend
+```
 
-- Android API 28+ (you need to set this in your project in `src-tauri/gen/android/app/build.gradle.kts`):
-  ```
-  ...
-  android {
-    ...
-    defaultConfig {
-      ...
-      minSdk = 28
-      ...
-    }
-    ...
+Register the plugin in `src-tauri/src/lib.rs`:
+
+```rust
+tauri::Builder::default()
+    .plugin(tauri_plugin_passkey::init())
+    // ...
+```
+
+Grant the permission in `src-tauri/capabilities/default.json`:
+
+```json
+{
+  "permissions": ["passkey:default"]
+}
+```
+
+## Platform setup
+
+Passkeys are bound to a domain, so each platform needs proof that your app owns your relying-party domain:
+
+- **macOS** — Associated Domains entitlement + apple-app-site-association; a signed `.app` bundle is required even in dev. Full walkthrough: [macos/README.md](./macos/README.md).
+- **iOS** — Associated Domains entitlement + apple-app-site-association. Full walkthrough: [ios/README.md](./ios/README.md).
+- **Android** — Digital Asset Links (`assetlinks.json`) matching your signing cert. Full walkthrough: [android/README.md](./android/README.md).
+- **Windows** — nothing beyond Windows 10 1903+; the origin is validated against the options you pass.
+- **Linux** — nothing; a CTAP2 authenticator (USB security key or platform authenticator) is used directly.
+
+## Usage
+
+```typescript
+import {
+  register,
+  authenticate,
+  isPasskeyError,
+} from "tauri-plugin-passkey-api";
+
+// `creationOptions` / `requestOptions` come from your RP server and are
+// standard WebAuthn JSON (PublicKeyCredentialCreationOptionsJSON etc.).
+try {
+  const credential = await register("https://example.com", creationOptions);
+  // send `credential` back to your server to finish registration
+} catch (e) {
+  if (isPasskeyError(e) && e.kind === "validation") {
+    // e.g. the rp.id in the options does not match the origin
   }
-  ...
-  ```
-- A `keystore.properties` file in the `src-tauri/gen/android` directory. This is required to sign the app. The documentation for this file can be found [here](https://tauri.app/distribute/sign/android/)
-- Additionally you need to define a `assetslink.json` and this needs to be hosted under a domain you own. This is required to verify the app with the webauthn api. The documentation for this file can be found [here](https://developer.android.com/identity/sign-in/credential-manager#add-support-dal) and the file can be generated [here](https://developers.google.com/digital-asset-links/tools/generator). This also needs to be included in you app manifest file at `src-tauri/gen/android/app/src/main/AndroidManifest.xml`:
-  ```xml
-  ...
-  <application>
-    ...
-    <meta-data android:name="asset_statements" android:resource="@string/asset_statements" />
-    ...
-  </application>
-  ...
-  ```
-  and the string resource needs to be defined in `src-tauri/gen/android/app/src/main/res/values/strings.xml`:
-  ```xml
-  <resources>
-    ...
-    <string name="asset_statements" translatable="false">
-    [{
-    \"include\": \"https://your.domain.com/.well-known/assetlinks.json\"
-    }]
-    </string>
-    ...
-  </resources>
-  ```
+}
 
-### iOS
+const assertion = await authenticate("https://example.com", requestOptions);
+// optional third argument: timeout in milliseconds (default 60000)
+```
 
-iOS support uses Apple's ASAuthorization framework. It requires iOS 15+ (PRF extension: iOS 18+), code signing with Associated Domains entitlements (`webcredentials:your.domain.com`), and an `apple-app-site-association` file hosted on the relying party domain.
+## Errors
 
-# Usage
+Every rejected promise carries a `PasskeyError`:
 
-The `register` and `authenticate` methods can be used nearly identically to the `@simplewebauthn/browser`. The biggest difference is the `sendPin` method and the event handler
-which is only required on Linux (Windows and Android handle the pin natively which means no events will be sent on those platforms and the pin method does nothing).
-An example can be found in the `test-app` directory. It works on all supported platforms. On Linux, non-discoverable credentials require the server's allowCredentials list to be passed through unmodified, and the origin string must exactly match the server's expectedOrigin (no trailing slash).
+```typescript
+{
+  kind: string;
+  message: string;
+}
+```
 
-## Credential Discovery
+Current kinds: `validation` (origin/rpId mismatch and similar precondition failures), `authenticator` (the ceremony failed or was declined), `platform` (native API error), `noToken`, `io`, `serialization`. The set is non-exhaustive — new kinds may be added in minor releases, so treat unknown kinds as generic failures. `message` is display text; do not parse it.
 
-This plugin supports credential discovery but not all underlying libraries do. Currently it works on all platforms except Windows.
+## Events (Linux only)
+
+On Linux the plugin emits interaction events (PIN required, touch required, key selection) that your UI must handle with `registerListener`, `sendPin`, and `selectKey`:
+
+```typescript
+import {
+  registerListener,
+  sendPin,
+  selectKey,
+  PasskeyEventType,
+} from "tauri-plugin-passkey-api";
+
+const unlisten = await registerListener((event) => {
+  switch (event.type) {
+    case PasskeyEventType.PinEvent:
+      /* prompt for PIN, then sendPin(pin) */ break;
+    case PasskeyEventType.SelectKey:
+      /* show event.keys, then selectKey(i) */ break;
+    case PasskeyEventType.PresenceRequired:
+      /* "touch your key" */ break;
+  }
+});
+```
+
+These are no-ops on other platforms — safe to wire unconditionally.
+
+## Example app
+
+A complete relying-party + frontend example (including PRF, discoverable and non-discoverable flows) lives in [`test-app/`](https://github.com/dkackman/tauri-plugin-passkey/tree/main/test-app).
+
+## License
+
+MIT OR Apache-2.0
