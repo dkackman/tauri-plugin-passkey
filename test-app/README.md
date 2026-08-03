@@ -116,6 +116,35 @@ The `apps` array entry must be `TEAM_ID.BUNDLE_ID` with a dot separator (not a s
 
 Deploy with `wrangler deploy`, then [add a custom domain](https://developers.cloudflare.com/workers/configuration/routing/custom-domains/) in the Cloudflare dashboard.
 
+### Android: the signing cert is also the app's WebAuthn origin
+
+`assetlinks.json` is only half the job. On Android, Credential Manager does not put the web origin in `clientDataJSON` — it puts
+
+```text
+android:apk-key-hash:<base64url(SHA-256(signing cert DER)), unpadded>
+```
+
+That is the _same_ certificate hash as `sha256_cert_fingerprints`, just base64url instead of colon-separated hex. The relying party has to allow that origin as well, or you get a confusing failure mode: `assetlinks.json` validates, the biometric prompt appears and succeeds, and then verification rejects the credential with `InvalidRPOrigin`.
+
+This test app's local verifier reads the value from `PASSKEY_APK_KEY_HASH`, defaulting to the standard Android debug keystore. Derive it straight from the keystore you sign with:
+
+```bash
+keytool -exportcert -keystore ~/.android/debug.keystore \
+    -storepass android -alias androiddebugkey \
+  | openssl dgst -sha256 -binary \
+  | openssl base64 | tr -d '\n' | tr '+/' '-_' | tr -d '='
+```
+
+Then set it in `.env`:
+
+```env
+PASSKEY_APK_KEY_HASH=android:apk-key-hash:<value from above>
+```
+
+Keep the two in sync — whenever you change the fingerprint in `assetlinks.json`, change this too. `sha256_cert_fingerprints` is an array, so a worker can serve debug and release fingerprints at once, but the app allows one origin at a time.
+
+Under [Play App Signing](https://developer.android.com/studio/publish/app-signing#app-signing-google-play), the certificate that matters is Google's re-signing cert from the Play Console, not your upload key — take the fingerprint from **Release > Setup > App signing** and derive the hash from that.
+
 ### Verify
 
 ```bash

@@ -42,6 +42,7 @@ jobs:
             ~/.cargo/registry
             ~/.cargo/git
             tauri-plugin-passkey/target
+            test-app/src-tauri/target
           key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
           restore-keys: |
             ${{ runner.os }}-cargo-
@@ -49,7 +50,19 @@ jobs:
       - name: Check formatting
         run: cargo fmt --check
 
+      # test-app/src-tauri is a separate crate, not a workspace member, so the checks
+      # for the plugin do not reach it. Both crates use plain rustfmt defaults.
+      - name: Check test-app formatting
+        working-directory: test-app/src-tauri
+        run: cargo fmt --check
+
       - name: Run clippy
+        run: cargo clippy --all-targets -- -D warnings
+
+      # The test app consumes the plugin the way a downstream app does, so its lints
+      # catch API-surface problems the plugin's own build cannot see.
+      - name: Run clippy on test-app
+        working-directory: test-app/src-tauri
         run: cargo clippy --all-targets -- -D warnings
 
       - name: Check compilation
@@ -88,10 +101,17 @@ jobs:
           node-version: "22"
           cache: "pnpm"
 
+      # From the repo root, so every workspace project is installed — test-app's
+      # prettier config declares prettier-plugin-svelte, which the formatting check
+      # below has to be able to resolve.
       - name: Install dependencies
+        working-directory: .
         run: pnpm install
 
+      # Also from the root: the job otherwise runs inside tauri-plugin-passkey, which
+      # would leave test-app and the root-level docs/workflows unchecked.
       - name: Check formatting
+        working-directory: .
         run: pnpm exec prettier --check .
 
       - name: Build TypeScript

@@ -25,6 +25,7 @@
     "lint:kotlin": "pnpm -r lint:kotlin"
   },
   "devDependencies": {
-    "prettier": "^3.9.6"
+    "prettier": "^3.9.6",
+    "prettier-plugin-svelte": "^4.1.1"
   }
 }
