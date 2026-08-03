@@ -43,11 +43,18 @@ fn rp_origin() -> String {
   env::var("WEBAUTHN_RP_ORIGIN").unwrap_or_else(|_| DEFAULT_RP_ORIGIN.to_string())
 }
 
-// The APK signing-cert hash differs per developer keystore. Override with
-// PASSKEY_APK_KEY_HASH; the default matches this repo's debug keystore only.
+// On Android, Credential Manager sets clientDataJSON.origin to
+// `android:apk-key-hash:<base64url(SHA-256(signing cert DER))>` rather than the web
+// origin, so that value has to be an allowed origin here or verification fails with
+// InvalidRPOrigin after the biometric prompt has already succeeded. It differs per
+// developer keystore — override with PASSKEY_APK_KEY_HASH. The default is the standard
+// Android debug keystore (`~/.android/debug.keystore`), which is also the fingerprint
+// published in webauthn.dkackman.com's assetlinks.json. Derive your own with
+// `keytool -list -v -keystore <keystore> | grep SHA256`, then base64url-encode those
+// 32 bytes without padding.
 fn apk_key_hash() -> String {
   env::var("PASSKEY_APK_KEY_HASH")
-    .unwrap_or_else(|_| "android:apk-key-hash:W8LAR3CdJ3CAVCTuv3_J5fF2iKYGYQhYfKq9ANbOzjI".to_string())
+    .unwrap_or_else(|_| "android:apk-key-hash:ACDefg1Oe_Oghhc1udjQbgeC9Za9h_fyf9vjJaBx-VI".to_string())
 }
 
 #[derive(Clone, Serialize, Deserialize)]
@@ -511,4 +518,36 @@ pub fn run() {
     ])
     .run(tauri::generate_context!())
     .expect("error while running tauri application");
+}
+
+#[cfg(test)]
+mod tests {
+  use super::*;
+
+  /// The Android origin the local verifier allows has to be derived from the same
+  /// signing cert that webauthn.dkackman.com's assetlinks.json publishes — otherwise
+  /// Credential Manager happily creates the credential and `finish_passkey_registration`
+  /// then rejects it with `InvalidRPOrigin`.
+  #[test]
+  fn default_apk_key_hash_matches_published_assetlinks_fingerprint() {
+    // 00:20:DE:7E:0D:4E:7B:F3:A0:86:17:35:B9:D8:D0:6E:
+    // 07:82:F5:96:BD:87:F7:F2:7F:DB:E3:25:A0:71:F9:52
+    const ASSETLINKS_SHA256: [u8; 32] = [
+      0x00, 0x20, 0xDE, 0x7E, 0x0D, 0x4E, 0x7B, 0xF3, 0xA0, 0x86, 0x17, 0x35, 0xB9, 0xD8, 0xD0,
+      0x6E, 0x07, 0x82, 0xF5, 0x96, 0xBD, 0x87, 0xF7, 0xF2, 0x7F, 0xDB, 0xE3, 0x25, 0xA0, 0x71,
+      0xF9, 0x52,
+    ];
+
+    // The literal, not apk_key_hash(): tests share a process, so don't mutate the env.
+    let default = "android:apk-key-hash:ACDefg1Oe_Oghhc1udjQbgeC9Za9h_fyf9vjJaBx-VI";
+    let b64 = default.strip_prefix("android:apk-key-hash:").unwrap();
+    assert_eq!(URL_SAFE_NO_PAD.decode(b64).unwrap(), ASSETLINKS_SHA256);
+  }
+
+  #[test]
+  fn build_webauthn_allows_the_android_apk_origin() {
+    let webauthn = build_webauthn(DEFAULT_RP_ID, DEFAULT_RP_ORIGIN).unwrap();
+    let android = Url::parse(&apk_key_hash()).unwrap();
+    assert!(webauthn.get_allowed_origins().contains(&android));
+  }
 }
