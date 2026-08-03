@@ -2,8 +2,8 @@
   // PublicKeyCredentialCreationOptionsJSON / PublicKeyCredentialRequestOptionsJSON are
   // standard DOM types, globally available via the TypeScript "dom" lib — no import
   // needed. The plugin's own API surface declares them the same way.
-  import { invoke } from '@tauri-apps/api/core';
-  import { onMount } from 'svelte';
+  import { invoke } from "@tauri-apps/api/core";
+  import { onMount } from "svelte";
   import {
     register,
     authenticate,
@@ -13,46 +13,46 @@
     PasskeyEventType,
     sendPin,
     PinEventType,
-    selectKey
-  } from 'tauri-plugin-passkey-api';
+    selectKey,
+  } from "tauri-plugin-passkey-api";
 
   type LogEntry = {
     time: string;
-    level: 'info' | 'error' | 'action' | 'success';
+    level: "info" | "error" | "action" | "success";
     message: string;
   };
 
-  let name = $state('');
-  let authName = $state('');
-  let pin = $state('');
+  let name = $state("");
+  let authName = $state("");
+  let pin = $state("");
   let enablePrf = $state(false);
-  let prfSalt1 = $state('');
-  let prfSalt2 = $state('');
+  let prfSalt1 = $state("");
+  let prfSalt2 = $state("");
   let logs = $state<LogEntry[]>([]);
   let keys = $state<string[]>([]);
   let needsPin = $state(false);
   let busy = $state(false);
   let logEl: HTMLElement | undefined = $state();
-  let rpOrigin = $state('');
-  let rpId = $state('');
+  let rpOrigin = $state("");
+  let rpId = $state("");
   let showSettings = $state(false);
-  let settingsRpId = $state('');
-  let settingsRpOrigin = $state('');
+  let settingsRpId = $state("");
+  let settingsRpOrigin = $state("");
 
   function generateSalt(): string {
     const bytes = new Uint8Array(32);
     crypto.getRandomValues(bytes);
     return btoa(String.fromCharCode(...bytes))
-      .replace(/\+/g, '-')
-      .replace(/\//g, '_')
-      .replace(/=/g, '');
+      .replace(/\+/g, "-")
+      .replace(/\//g, "_")
+      .replace(/=/g, "");
   }
 
   function timestamp() {
     return new Date().toLocaleTimeString();
   }
 
-  function log(level: LogEntry['level'], message: string) {
+  function log(level: LogEntry["level"], message: string) {
     logs.push({ time: timestamp(), level, message });
     requestAnimationFrame(() => {
       if (logEl) logEl.scrollTop = logEl.scrollHeight;
@@ -61,45 +61,45 @@
 
   async function loadConfig() {
     // Check localStorage first
-    const saved = localStorage.getItem('webauthn_rp_config');
+    const saved = localStorage.getItem("webauthn_rp_config");
     if (saved) {
       try {
         const config = JSON.parse(saved);
-        await invoke('set_rp_config', {
+        await invoke("set_rp_config", {
           rpId: config.rp_id,
-          rpOrigin: config.rp_origin
+          rpOrigin: config.rp_origin,
         });
         rpId = config.rp_id;
         rpOrigin = config.rp_origin;
         return;
       } catch {
-        localStorage.removeItem('webauthn_rp_config');
+        localStorage.removeItem("webauthn_rp_config");
       }
     }
     // Fall back to backend defaults (from env vars or hardcoded)
     const config: { rp_id: string; rp_origin: string } =
-      await invoke('get_rp_config');
+      await invoke("get_rp_config");
     rpId = config.rp_id;
     rpOrigin = config.rp_origin;
   }
 
   async function saveSettings() {
     try {
-      await invoke('set_rp_config', {
+      await invoke("set_rp_config", {
         rpId: settingsRpId,
-        rpOrigin: settingsRpOrigin
+        rpOrigin: settingsRpOrigin,
       });
       rpId = settingsRpId;
       rpOrigin = settingsRpOrigin;
       localStorage.setItem(
-        'webauthn_rp_config',
+        "webauthn_rp_config",
         JSON.stringify({ rp_id: rpId, rp_origin: rpOrigin })
       );
       showSettings = false;
-      log('success', `RP config updated: ${rpId} (${rpOrigin})`);
+      log("success", `RP config updated: ${rpId} (${rpOrigin})`);
     } catch (e: any) {
       log(
-        'error',
+        "error",
         `Failed to update RP config: ${isPasskeyError(e) ? `${e.kind}: ${e.message}` : String(e)}`
       );
     }
@@ -112,7 +112,7 @@
   }
 
   function resetSettings() {
-    localStorage.removeItem('webauthn_rp_config');
+    localStorage.removeItem("webauthn_rp_config");
     showSettings = false;
     // Reload to pick up env/default values
     window.location.reload();
@@ -120,28 +120,28 @@
 
   const reg = async () => {
     if (!name.trim()) {
-      log('error', 'Please enter a username first.');
+      log("error", "Please enter a username first.");
       return;
     }
     busy = true;
     needsPin = false;
     try {
-      log('info', `Starting registration for "${name}"...`);
+      log("info", `Starting registration for "${name}"...`);
       let options: PublicKeyCredentialCreationOptionsJSON = await invoke(
-        'reg_start',
+        "reg_start",
         { name, enablePrf }
       );
-      log('info', 'Got challenge from server. Waiting for authenticator...');
-      log('action', 'Use Touch ID, security key, or passkey now.');
+      log("info", "Got challenge from server. Waiting for authenticator...");
+      log("action", "Use Touch ID, security key, or passkey now.");
 
       let response = await register(rpOrigin, options);
-      log('info', 'Got response from authenticator. Verifying...');
+      log("info", "Got response from authenticator. Verifying...");
 
-      await invoke('reg_finish', { response });
-      log('success', `Registration successful for "${name}"!`);
+      await invoke("reg_finish", { response });
+      log("success", `Registration successful for "${name}"!`);
     } catch (e: any) {
       log(
-        'error',
+        "error",
         `Registration failed: ${isPasskeyError(e) ? `${e.kind}: ${e.message}` : String(e)}`
       );
     } finally {
@@ -154,25 +154,25 @@
     busy = true;
     needsPin = false;
     try {
-      log('info', 'Starting discoverable authentication...');
+      log("info", "Starting discoverable authentication...");
       let options: PublicKeyCredentialRequestOptionsJSON = await invoke(
-        'auth_start',
+        "auth_start",
         { salt1: prfSalt1 || null, salt2: prfSalt2 || null }
       );
-      log('info', 'Got challenge. Waiting for authenticator...');
-      log('action', 'Use Touch ID, security key, or passkey now.');
+      log("info", "Got challenge. Waiting for authenticator...");
+      log("action", "Use Touch ID, security key, or passkey now.");
 
       let response = await authenticate(rpOrigin, options);
-      log('info', 'Got response from authenticator. Verifying...');
+      log("info", "Got response from authenticator. Verifying...");
 
-      const result = await invoke('auth_finish', { response });
+      const result = await invoke("auth_finish", { response });
       if (result) {
-        log('success', `PRF Results: ${JSON.stringify(result)}`);
+        log("success", `PRF Results: ${JSON.stringify(result)}`);
       }
-      log('success', 'Authentication successful!');
+      log("success", "Authentication successful!");
     } catch (e: any) {
       log(
-        'error',
+        "error",
         `Authentication failed: ${isPasskeyError(e) ? `${e.kind}: ${e.message}` : String(e)}`
       );
     } finally {
@@ -183,31 +183,31 @@
 
   const auth_non_discoverable = async () => {
     if (!authName.trim()) {
-      log('error', 'Please enter a username first.');
+      log("error", "Please enter a username first.");
       return;
     }
     busy = true;
     needsPin = false;
     try {
-      log('info', `Starting authentication for "${authName}"...`);
+      log("info", `Starting authentication for "${authName}"...`);
       let options: PublicKeyCredentialRequestOptionsJSON = await invoke(
-        'auth_start_non_discoverable',
+        "auth_start_non_discoverable",
         { name: authName, salt1: prfSalt1 || null, salt2: prfSalt2 || null }
       );
-      log('info', 'Got challenge. Waiting for authenticator...');
-      log('action', 'Use Touch ID, security key, or passkey now.');
+      log("info", "Got challenge. Waiting for authenticator...");
+      log("action", "Use Touch ID, security key, or passkey now.");
 
       let response = await authenticate(rpOrigin, options);
-      log('info', 'Got response from authenticator. Verifying...');
+      log("info", "Got response from authenticator. Verifying...");
 
-      const result = await invoke('auth_finish_non_discoverable', { response });
+      const result = await invoke("auth_finish_non_discoverable", { response });
       if (result) {
-        log('success', `PRF Results: ${JSON.stringify(result)}`);
+        log("success", `PRF Results: ${JSON.stringify(result)}`);
       }
-      log('success', 'Authentication successful!');
+      log("success", "Authentication successful!");
     } catch (e: any) {
       log(
-        'error',
+        "error",
         `Authentication failed: ${isPasskeyError(e) ? `${e.kind}: ${e.message}` : String(e)}`
       );
     } finally {
@@ -218,18 +218,18 @@
 
   const pinSend = async () => {
     if (!pin.trim()) {
-      log('error', 'Please enter a PIN.');
+      log("error", "Please enter a PIN.");
       return;
     }
     try {
-      log('info', 'Sending PIN...');
+      log("info", "Sending PIN...");
       await sendPin(pin);
-      log('info', 'PIN sent. Waiting for response...');
-      pin = '';
+      log("info", "PIN sent. Waiting for response...");
+      pin = "";
       needsPin = false;
     } catch (e: any) {
       log(
-        'error',
+        "error",
         `Failed to send PIN: ${isPasskeyError(e) ? `${e.kind}: ${e.message}` : String(e)}`
       );
     }
@@ -237,56 +237,56 @@
 
   onMount(async () => {
     await loadConfig();
-    log('info', `WebAuthn example ready. RP: ${rpId} (${rpOrigin})`);
+    log("info", `WebAuthn example ready. RP: ${rpId} (${rpOrigin})`);
     registerListener((event) => {
       switch (event.type) {
         case PasskeyEventType.SelectDevice:
           log(
-            'action',
-            'Multiple devices found. Touch the one you want to use.'
+            "action",
+            "Multiple devices found. Touch the one you want to use."
           );
           break;
         case PasskeyEventType.PresenceRequired:
-          log('action', 'Touch your authenticator to confirm.');
+          log("action", "Touch your authenticator to confirm.");
           break;
         case PasskeyEventType.PinEvent:
           switch (event.event.type) {
             case PinEventType.PinRequired:
               needsPin = true;
-              log('action', 'PIN required. Enter it below.');
+              log("action", "PIN required. Enter it below.");
               break;
             case PinEventType.InvalidPin:
               needsPin = true;
               log(
-                'error',
-                `Invalid PIN.${event.event.attempts_remaining ? ` ${event.event.attempts_remaining} attempts remaining.` : ''}`
+                "error",
+                `Invalid PIN.${event.event.attempts_remaining ? ` ${event.event.attempts_remaining} attempts remaining.` : ""}`
               );
               break;
             case PinEventType.PinAuthBlocked:
               log(
-                'error',
-                'PIN authentication blocked. Remove and re-insert device.'
+                "error",
+                "PIN authentication blocked. Remove and re-insert device."
               );
               needsPin = false;
               break;
             case PinEventType.PinBlocked:
-              log('error', 'PIN is permanently blocked. Device must be reset.');
+              log("error", "PIN is permanently blocked. Device must be reset.");
               needsPin = false;
               break;
             case PinEventType.InvalidUv:
               log(
-                'error',
-                `Invalid user verification.${event.event.attempts_remaining ? ` ${event.event.attempts_remaining} attempts remaining.` : ''}`
+                "error",
+                `Invalid user verification.${event.event.attempts_remaining ? ` ${event.event.attempts_remaining} attempts remaining.` : ""}`
               );
               break;
             case PinEventType.UvBlocked:
-              log('error', 'User verification blocked.');
+              log("error", "User verification blocked.");
               break;
           }
           break;
         case PasskeyEventType.SelectKey:
           keys = event.keys.map((key) => key.name ?? key.displayName ?? key.id);
-          log('action', `${keys.length} keys found. Select one below.`);
+          log("action", `${keys.length} keys found. Select one below.`);
           break;
       }
     });
@@ -439,7 +439,9 @@
     <div class="action-group">
       <h3>Cancel</h3>
       <div class="row">
-        <button type="button" onclick={() => cancel()} disabled={!busy}>Cancel</button>
+        <button type="button" onclick={() => cancel()} disabled={!busy}
+          >Cancel</button
+        >
       </div>
     </div>
   </section>
@@ -467,7 +469,7 @@
         <button
           class="key-btn"
           onclick={() => {
-            log('info', `Selected key: ${key}`);
+            log("info", `Selected key: ${key}`);
             selectKey(i);
             keys = [];
           }}
@@ -487,13 +489,13 @@
       <div class="log-entry {entry.level}">
         <span class="log-time">{entry.time}</span>
         <span class="log-badge"
-          >{entry.level === 'action'
-            ? 'ACTION'
-            : entry.level === 'success'
-              ? 'OK'
-              : entry.level === 'error'
-                ? 'ERROR'
-                : 'INFO'}</span
+          >{entry.level === "action"
+            ? "ACTION"
+            : entry.level === "success"
+              ? "OK"
+              : entry.level === "error"
+                ? "ERROR"
+                : "INFO"}</span
         >
         <span class="log-msg">{entry.message}</span>
       </div>
@@ -504,7 +506,7 @@
 <style>
   :root {
     font-family:
-      -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial,
+      -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial,
       sans-serif;
     font-size: 14px;
     line-height: 1.5;
@@ -721,7 +723,7 @@
     gap: 0.5rem;
     align-items: baseline;
     padding: 0.2rem 0;
-    font-family: 'SF Mono', Menlo, Consolas, monospace;
+    font-family: "SF Mono", Menlo, Consolas, monospace;
     font-size: 0.8rem;
     line-height: 1.4;
   }

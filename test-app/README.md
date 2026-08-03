@@ -56,51 +56,51 @@ export default {
 
     // Apple Associated Domains
     if (
-      url.pathname === '/.well-known/apple-app-site-association' ||
-      url.pathname === '/.well-known/apple-app-site-data'
+      url.pathname === "/.well-known/apple-app-site-association" ||
+      url.pathname === "/.well-known/apple-app-site-data"
     ) {
       return new Response(
         JSON.stringify({
           webcredentials: {
-            apps: ['TEAM_ID.BUNDLE_ID']
-          }
+            apps: ["TEAM_ID.BUNDLE_ID"],
+          },
         }),
         {
           headers: {
-            'Content-Type': 'application/json',
-            'Access-Control-Allow-Origin': '*'
-          }
+            "Content-Type": "application/json",
+            "Access-Control-Allow-Origin": "*",
+          },
         }
       );
     }
 
     // Android Digital Asset Links
-    else if (url.pathname === '/.well-known/assetlinks.json') {
+    else if (url.pathname === "/.well-known/assetlinks.json") {
       return new Response(
         JSON.stringify([
           {
             relation: [
-              'delegate_permission/common.handle_all_urls',
-              'delegate_permission/common.get_login_creds'
+              "delegate_permission/common.handle_all_urls",
+              "delegate_permission/common.get_login_creds",
             ],
             target: {
-              namespace: 'android_app',
-              package_name: 'BUNDLE_ID',
-              sha256_cert_fingerprints: ['YOUR_SHA256_FINGERPRINT']
-            }
-          }
+              namespace: "android_app",
+              package_name: "BUNDLE_ID",
+              sha256_cert_fingerprints: ["YOUR_SHA256_FINGERPRINT"],
+            },
+          },
         ]),
         {
           headers: {
-            'Content-Type': 'application/json',
-            'Access-Control-Allow-Origin': '*'
-          }
+            "Content-Type": "application/json",
+            "Access-Control-Allow-Origin": "*",
+          },
         }
       );
     }
 
-    return new Response('WebAuthn RP', { status: 200 });
-  }
+    return new Response("WebAuthn RP", { status: 200 });
+  },
 };
 ```
 
