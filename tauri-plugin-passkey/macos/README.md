@@ -271,7 +271,21 @@ Example server-side registration options:
 }
 ```
 
-`requireResidentKey: true` is required - the `webauthn-rs-proto` crate deserializes this as a non-optional `bool` field.
+`requireResidentKey` is **optional** for client-generated options: the plugin normalizes browser-standard WebAuthn JSON, so if you build options in the webview and omit it (as `@simplewebauthn/browser` does), the plugin defaults it — `true` only when `residentKey` is `"required"`, otherwise `false`. Server-generated `webauthn-rs` options already include it.
+
+### PRF / hmac-secret extension
+
+The plugin accepts the browser `prf` extension directly and returns the browser `clientExtensionResults.prf` on the response, so it is a drop-in for clients built around the DOM WebAuthn API:
+
+```jsonc
+// registration options — enable PRF for the new credential
+"extensions": { "prf": {} }
+
+// assertion options — evaluate PRF with your per-credential salt
+"extensions": { "prf": { "eval": { "first": "<base64url salt>" } } }
+```
+
+The recovered secret is at `assertion.clientExtensionResults.prf.results.first` (base64url). The equivalent `webauthn-rs-proto` `hmacCreateSecret` / `hmacGetSecret` shape (what server-generated options use) is also accepted and still returned as `hmac_get_secret`.
 
 ## Limitations
 
