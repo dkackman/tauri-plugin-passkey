@@ -38,6 +38,14 @@ pub fn apply_android_resident_key(
                 .into(),
         )),
         Some(_) => Ok(()),
+        // WebAuthn Level 1 compatibility, matching CTAP2's `convert_resident_key`:
+        // an explicit `requireResidentKey: true` with `residentKey` absent still
+        // means "required" here, not "preferred" — otherwise the same options
+        // would mean different things on Android than on Linux.
+        None if selection.require_resident_key => {
+            selection.resident_key = Some(ResidentKeyRequirement::Required);
+            Ok(())
+        }
         None => {
             selection.resident_key = Some(ResidentKeyRequirement::Preferred);
             selection.require_resident_key = false;
@@ -99,6 +107,26 @@ mod tests {
         assert!(matches!(
             options.authenticator_selection.unwrap().resident_key,
             Some(ResidentKeyRequirement::Preferred)
+        ));
+    }
+
+    #[test]
+    fn android_honours_explicit_require_resident_key_when_resident_key_absent() {
+        // `commands.rs`'s `default_require_resident_key` preserves a caller's
+        // explicit `requireResidentKey: true` even when `residentKey` is absent;
+        // Android must not then downgrade it to "preferred" (that would mean
+        // "required" on Linux/CTAP2 but "preferred" on Android for identical
+        // input options).
+        let mut options = creation_options(Some(AuthenticatorSelectionCriteria {
+            authenticator_attachment: None,
+            resident_key: None,
+            require_resident_key: true,
+            user_verification: webauthn_rs_proto::UserVerificationPolicy::Preferred,
+        }));
+        apply_android_resident_key(&mut options).unwrap();
+        assert!(matches!(
+            options.authenticator_selection.unwrap().resident_key,
+            Some(ResidentKeyRequirement::Required)
         ));
     }
 
