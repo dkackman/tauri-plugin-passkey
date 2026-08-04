@@ -10,10 +10,10 @@ use crate::WebauthnExt;
 
 const DEFAULT_TIMEOUT: u32 = 60_000;
 
-/// Options and responses cross this boundary as raw JSON so the plugin can accept
-/// browser-standard WebAuthn shapes (including the `prf` extension) and return the
-/// browser `prf` results, translating to/from the webauthn-rs-proto shapes the
-/// platform authenticators use. See [`crate::normalize`].
+/// Options and responses cross this boundary as raw JSON so the plugin speaks the
+/// browser's WebAuthn shapes. PRF is read from `extensions.prf` and returned in
+/// `clientExtensionResults.prf`; it is the only PRF spelling accepted or emitted.
+/// See [`crate::prf`].
 #[command]
 pub(crate) async fn register<R: Runtime>(
     app: AppHandle<R>,
@@ -21,16 +21,17 @@ pub(crate) async fn register<R: Runtime>(
     mut options: Value,
     timeout: Option<u32>,
 ) -> Result<Value> {
-    crate::normalize::normalize_creation_options(&mut options);
+    crate::normalize::default_require_resident_key(&mut options);
+    let prf = crate::prf::registration_input_from_options(&options)?;
     let options: PublicKeyCredentialCreationOptions = serde_json::from_value(options)?;
     crate::validation::validate_rp_id(&origin, &options.rp.id)?;
-    let credential = block_in_place(|| {
+    let (credential, prf_output) = block_in_place(|| {
         app.webauthn()
-            .register(origin, options, timeout.unwrap_or(DEFAULT_TIMEOUT))
+            .register(origin, options, prf, timeout.unwrap_or(DEFAULT_TIMEOUT))
             .log()
     })?;
     let mut response = serde_json::to_value(credential)?;
-    crate::normalize::add_prf_to_registration_response(&mut response);
+    crate::prf::set_registration_prf(&mut response, prf_output);
     Ok(response)
 }
 
@@ -38,19 +39,19 @@ pub(crate) async fn register<R: Runtime>(
 pub(crate) async fn authenticate<R: Runtime>(
     app: AppHandle<R>,
     origin: Url,
-    mut options: Value,
+    options: Value,
     timeout: Option<u32>,
 ) -> Result<Value> {
-    crate::normalize::normalize_request_options(&mut options);
+    let prf = crate::prf::authentication_input_from_options(&options)?;
     let options: PublicKeyCredentialRequestOptions = serde_json::from_value(options)?;
     crate::validation::validate_rp_id(&origin, &options.rp_id)?;
-    let credential = block_in_place(|| {
+    let (credential, prf_output) = block_in_place(|| {
         app.webauthn()
-            .authenticate(origin, options, timeout.unwrap_or(DEFAULT_TIMEOUT))
+            .authenticate(origin, options, prf, timeout.unwrap_or(DEFAULT_TIMEOUT))
             .log()
     })?;
     let mut response = serde_json::to_value(credential)?;
-    crate::normalize::add_prf_to_assertion_response(&mut response);
+    crate::prf::set_authentication_prf(&mut response, prf_output);
     Ok(response)
 }
 

@@ -31,6 +31,9 @@ use webauthn_rs_proto::{
 };
 
 use crate::authenticators::ctap2::event::WebauthnEvent;
+use crate::prf::{
+    PrfAuthenticationInput, PrfAuthenticationOutput, PrfRegistrationInput, PrfRegistrationOutput,
+};
 
 use super::EVENT_NAME;
 
@@ -45,8 +48,9 @@ pub fn perform_register(
     status_tx: Sender<StatusUpdate>,
     url: Url,
     options: PublicKeyCredentialCreationOptions,
+    prf: Option<PrfRegistrationInput>,
     timeout: u64,
-) -> crate::Result<RegisterPublicKeyCredential> {
+) -> crate::Result<(RegisterPublicKeyCredential, Option<PrfRegistrationOutput>)> {
     let client_data =
         crate::validation::build_client_data("webauthn.create", &options.challenge, &url)?;
 
@@ -79,7 +83,7 @@ pub fn perform_register(
         },
         exclude_list,
         resident_key_req,
-        extensions: convert_request_registration_extensions(options.extensions),
+        extensions: convert_request_registration_extensions(options.extensions, prf),
         pub_cred_params: convert_algorithms(options.pub_key_cred_params),
     };
 
@@ -122,7 +126,11 @@ pub fn perform_register(
             crate::Error::Authenticator("attestation object is missing credential data".to_string())
         })?;
 
-    Ok(webauthn_rs_proto::RegisterPublicKeyCredential {
+    let prf_output = prf.map(|_| PrfRegistrationOutput {
+        enabled: result.extensions.hmac_create_secret.unwrap_or(false),
+    });
+
+    let credential = webauthn_rs_proto::RegisterPublicKeyCredential {
         extensions: convert_response_registration_extensions(result.extensions),
         response: webauthn_rs_proto::AuthenticatorAttestationResponseRaw {
             attestation_object: serde_cbor_2::to_vec(&result.att_obj)?.into(),
@@ -137,7 +145,9 @@ pub fn perform_register(
         id: BASE64_URL_SAFE_NO_PAD.encode(&raw_id),
         raw_id: raw_id.into(),
         type_: "public-key".to_string(),
-    })
+    };
+
+    Ok((credential, prf_output))
 }
 
 pub fn perform_authentication(
@@ -145,8 +155,9 @@ pub fn perform_authentication(
     status_tx: Sender<StatusUpdate>,
     url: Url,
     options: PublicKeyCredentialRequestOptions,
+    prf: Option<PrfAuthenticationInput>,
     timeout: u64,
-) -> crate::Result<PublicKeyCredential> {
+) -> crate::Result<(PublicKeyCredential, Option<PrfAuthenticationOutput>)> {
     let client_data =
         crate::validation::build_client_data("webauthn.get", &options.challenge, &url)?;
 
@@ -172,7 +183,7 @@ pub fn perform_authentication(
         user_verification_req: convert_user_verification(options.user_verification),
         use_ctap1_fallback: false,
         allow_list: convert_allow_list(options.allow_credentials),
-        extensions: convert_request_authentication_extensions(options.extensions)?,
+        extensions: convert_request_authentication_extensions(options.extensions, prf.as_ref())?,
     };
 
     let (sign_tx, sign_rx) = channel();
@@ -218,7 +229,16 @@ pub fn perform_authentication(
     };
     let auth_data = result.assertion.auth_data.to_vec();
 
-    Ok(PublicKeyCredential {
+    let prf_output = result
+        .extensions
+        .hmac_get_secret
+        .as_ref()
+        .map(|h| PrfAuthenticationOutput {
+            first: h.output1.to_vec(),
+            second: h.output2.map(|s| s.to_vec()),
+        });
+
+    let credential = PublicKeyCredential {
         id: BASE64_URL_SAFE_NO_PAD.encode(&raw_id),
         raw_id: raw_id.into(),
         type_: "public-key".to_string(),
@@ -229,7 +249,9 @@ pub fn perform_authentication(
             user_handle: result.assertion.user.map(|h| h.id.into()),
         },
         extensions: convert_response_authentication_extensions(result.extensions),
-    })
+    };
+
+    Ok((credential, prf_output))
 }
 
 pub fn status<R: Runtime>(
@@ -292,21 +314,18 @@ fn convert_salt(salt: Vec<u8>) -> crate::Result<[u8; 32]> {
 
 fn convert_request_authentication_extensions(
     extensions: Option<RequestAuthenticationExtensions>,
+    prf: Option<&PrfAuthenticationInput>,
 ) -> crate::Result<AuthenticationExtensionsClientInputs> {
-    let Some(e) = extensions else {
-        return Ok(AuthenticationExtensionsClientInputs::default());
-    };
-
-    let hmac_get_secret = match e.hmac_get_secret {
-        Some(h) => Some(HMACGetSecretInput {
-            salt1: convert_salt(h.output1.to_vec())?,
-            salt2: h.output2.map(|s| convert_salt(s.to_vec())).transpose()?,
+    let hmac_get_secret = match prf {
+        Some(p) => Some(HMACGetSecretInput {
+            salt1: convert_salt(p.first.clone())?,
+            salt2: p.second.clone().map(convert_salt).transpose()?,
         }),
         None => None,
     };
 
     Ok(AuthenticationExtensionsClientInputs {
-        app_id: e.appid,
+        app_id: extensions.and_then(|e| e.appid),
         hmac_get_secret,
         ..Default::default()
     })
@@ -314,12 +333,12 @@ fn convert_request_authentication_extensions(
 
 fn convert_request_registration_extensions(
     extensions: Option<RequestRegistrationExtensions>,
+    prf: Option<PrfRegistrationInput>,
 ) -> AuthenticationExtensionsClientInputs {
-    extensions
+    let mut inputs = extensions
         .map(|e| AuthenticationExtensionsClientInputs {
             cred_props: e.cred_props,
             min_pin_length: e.min_pin_length,
-            hmac_create_secret: e.hmac_create_secret,
             credential_protection_policy: e
                 .cred_protect
                 .clone()
@@ -329,7 +348,9 @@ fn convert_request_registration_extensions(
                 .and_then(|c| c.enforce_credential_protection_policy),
             ..Default::default()
         })
-        .unwrap_or_default()
+        .unwrap_or_default();
+    inputs.hmac_create_secret = prf.map(|_| true);
+    inputs
 }
 
 fn convert_response_registration_extensions(
@@ -604,7 +625,7 @@ mod tests {
 
     #[test]
     fn convert_request_authentication_extensions_defaults_when_none() {
-        let out = convert_request_authentication_extensions(None).unwrap();
+        let out = convert_request_authentication_extensions(None, None).unwrap();
         assert!(out.hmac_get_secret.is_none());
         assert!(out.app_id.is_none());
     }
@@ -614,12 +635,13 @@ mod tests {
         let ext = webauthn_rs_proto::RequestAuthenticationExtensions {
             appid: Some("https://appid.example".to_string()),
             uvm: None,
-            hmac_get_secret: Some(webauthn_rs_proto::HmacGetSecretInput {
-                output1: vec![1u8; 32].into(),
-                output2: Some(vec![2u8; 32].into()),
-            }),
+            hmac_get_secret: None,
         };
-        let out = convert_request_authentication_extensions(Some(ext)).unwrap();
+        let prf = PrfAuthenticationInput {
+            first: vec![1u8; 32],
+            second: Some(vec![2u8; 32]),
+        };
+        let out = convert_request_authentication_extensions(Some(ext), Some(&prf)).unwrap();
         assert_eq!(out.app_id.as_deref(), Some("https://appid.example"));
         let hmac = out.hmac_get_secret.unwrap();
         assert_eq!(hmac.salt1, [1u8; 32]);
@@ -628,15 +650,11 @@ mod tests {
 
     #[test]
     fn convert_request_authentication_extensions_rejects_bad_salt_length() {
-        let ext = webauthn_rs_proto::RequestAuthenticationExtensions {
-            appid: None,
-            uvm: None,
-            hmac_get_secret: Some(webauthn_rs_proto::HmacGetSecretInput {
-                output1: vec![1u8; 8].into(), // too short
-                output2: None,
-            }),
+        let prf = PrfAuthenticationInput {
+            first: vec![1u8; 8], // too short for CTAP2 raw salt
+            second: None,
         };
-        assert!(convert_request_authentication_extensions(Some(ext)).is_err());
+        assert!(convert_request_authentication_extensions(None, Some(&prf)).is_err());
     }
 
     #[test]
@@ -650,9 +668,9 @@ mod tests {
             uvm: None,
             cred_props: Some(true),
             min_pin_length: Some(true),
-            hmac_create_secret: Some(true),
+            hmac_create_secret: None,
         };
-        let out = convert_request_registration_extensions(Some(ext));
+        let out = convert_request_registration_extensions(Some(ext), Some(PrfRegistrationInput));
         assert_eq!(out.cred_props, Some(true));
         assert_eq!(out.min_pin_length, Some(true));
         assert_eq!(out.hmac_create_secret, Some(true));
@@ -665,7 +683,7 @@ mod tests {
 
     #[test]
     fn convert_request_registration_extensions_defaults_when_none() {
-        let out = convert_request_registration_extensions(None);
+        let out = convert_request_registration_extensions(None, None);
         assert!(out.hmac_create_secret.is_none());
         assert!(out.credential_protection_policy.is_none());
     }

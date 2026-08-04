@@ -10,7 +10,12 @@
 //! apply the spec's derivation themselves. A backend speaking raw CTAP2 must call
 //! [`ctap_salt`] first.
 
-#![allow(dead_code)] // This module will be used by other tasks.
+// `set_registration_prf_input`/`set_authentication_prf_input` (and the
+// `extensions_mut` helper behind them) are only called from `mobile.rs`, which is
+// `#[cfg(mobile)]` and so does not compile on this desktop target; `ctap_salt` is
+// unused until Task 3 wires it into the CTAP2 salt conversion. Kept `pub` for the
+// backends/tasks that do use them.
+#![allow(dead_code)]
 
 use base64::{engine::general_purpose::URL_SAFE_NO_PAD, Engine};
 use serde_json::{json, Map, Value};

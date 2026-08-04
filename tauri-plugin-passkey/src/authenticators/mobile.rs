@@ -5,10 +5,13 @@ use tauri::{
     AppHandle, Runtime, Url,
 };
 use webauthn_rs_proto::{
-    AuthenticationExtensionsClientOutputs, AuthenticatorAssertionResponseRaw,
-    AuthenticatorAttestationResponseRaw, HmacGetSecretOutput, PublicKeyCredential,
+    AuthenticatorAssertionResponseRaw, AuthenticatorAttestationResponseRaw, PublicKeyCredential,
     PublicKeyCredentialCreationOptions, PublicKeyCredentialRequestOptions,
-    RegisterPublicKeyCredential, RegistrationExtensionsClientOutputs, ResidentKeyRequirement,
+    RegisterPublicKeyCredential,
+};
+
+use crate::prf::{
+    PrfAuthenticationInput, PrfAuthenticationOutput, PrfRegistrationInput, PrfRegistrationOutput,
 };
 
 use super::Authenticator;
@@ -31,33 +34,46 @@ impl<R: Runtime> Authenticator<R> for Webauthn<R> {
     fn register(
         &self,
         _origin: Url,
-        mut options: PublicKeyCredentialCreationOptions,
+        options: PublicKeyCredentialCreationOptions,
+        prf: Option<PrfRegistrationInput>,
         _timeout: u32,
-    ) -> crate::Result<RegisterPublicKeyCredential> {
-        // This is required to make Android save the passkey
-        if let Some(auth) = &mut options.authenticator_selection {
-            auth.resident_key = Some(ResidentKeyRequirement::Preferred);
+    ) -> crate::Result<(RegisterPublicKeyCredential, Option<PrfRegistrationOutput>)> {
+        let mut options = serde_json::to_value(&options)?;
+        if prf.is_some() {
+            // Credential Manager and ASAuthorization both want the browser spelling.
+            crate::prf::set_registration_prf_input(&mut options);
         }
 
-        // Deserialize to Value first so we can extract PRF data
         let v: serde_json::Value = self
             .0
             .run_mobile_plugin("register", serde_json::to_string(&options)?)?;
 
-        parse_registration_response(&v)
+        Ok((
+            parse_registration_response(&v)?,
+            crate::prf::registration_output_from_bridge(&v),
+        ))
     }
 
     fn authenticate(
         &self,
         _origin: Url,
         options: PublicKeyCredentialRequestOptions,
+        prf: Option<PrfAuthenticationInput>,
         _timeout: u32,
-    ) -> crate::Result<PublicKeyCredential> {
+    ) -> crate::Result<(PublicKeyCredential, Option<PrfAuthenticationOutput>)> {
+        let mut options = serde_json::to_value(&options)?;
+        if let Some(prf) = &prf {
+            crate::prf::set_authentication_prf_input(&mut options, prf);
+        }
+
         let v: serde_json::Value = self
             .0
             .run_mobile_plugin("authenticate", serde_json::to_string(&options)?)?;
 
-        parse_authentication_response(&v)
+        Ok((
+            parse_authentication_response(&v)?,
+            crate::prf::authentication_output_from_bridge(&v),
+        ))
     }
 
     fn cancel(&self) {
@@ -90,14 +106,6 @@ fn parse_registration_response(
     let attestation_object = json_bytes(response, "attestationObject")?;
     let client_data_json = json_bytes(response, "clientDataJSON")?;
 
-    // Parse PRF registration result: {"prf": {"enabled": true/false}}
-    let mut extensions = RegistrationExtensionsClientOutputs::default();
-    if let Some(prf) = v.get("prf") {
-        if let Some(enabled) = prf.get("enabled").and_then(|v| v.as_bool()) {
-            extensions.hmac_secret = Some(enabled);
-        }
-    }
-
     Ok(RegisterPublicKeyCredential {
         id,
         raw_id: Base64UrlSafeData::from(raw_id),
@@ -107,7 +115,7 @@ fn parse_registration_response(
             transports: None,
         },
         type_: "public-key".to_string(),
-        extensions,
+        extensions: Default::default(),
     })
 }
 
@@ -123,26 +131,6 @@ fn parse_authentication_response(v: &serde_json::Value) -> crate::Result<PublicK
         .as_str()
         .and_then(|s| base64_url_decode(s).ok());
 
-    // Parse PRF assertion result: {"prf": {"first": "base64url", "second": "base64url"}}
-    let mut extensions = AuthenticationExtensionsClientOutputs::default();
-    if let Some(prf) = v.get("prf") {
-        let first = prf
-            .get("first")
-            .and_then(|v| v.as_str())
-            .and_then(|s| base64_url_decode(s).ok());
-        let second = prf
-            .get("second")
-            .and_then(|v| v.as_str())
-            .and_then(|s| base64_url_decode(s).ok());
-
-        if let Some(first) = first {
-            extensions.hmac_get_secret = Some(HmacGetSecretOutput {
-                output1: Base64UrlSafeData::from(first),
-                output2: second.map(Base64UrlSafeData::from),
-            });
-        }
-    }
-
     Ok(PublicKeyCredential {
         id,
         raw_id: Base64UrlSafeData::from(raw_id),
@@ -153,7 +141,7 @@ fn parse_authentication_response(v: &serde_json::Value) -> crate::Result<PublicK
             user_handle: user_handle.map(Base64UrlSafeData::from),
         },
         type_: "public-key".to_string(),
-        extensions,
+        extensions: Default::default(),
     })
 }
 
