@@ -304,25 +304,16 @@ fn convert_response_authentication_extensions(
     }
 }
 
-/// PRF salts are supplied by the webview and must be exactly 32 bytes;
-/// anything else is a caller error rather than a reason to panic.
-fn convert_salt(salt: Vec<u8>) -> crate::Result<[u8; 32]> {
-    let len = salt.len();
-    salt.try_into()
-        .map_err(|_| crate::Error::Authenticator(format!("PRF salt must be 32 bytes, got {len}")))
-}
-
 fn convert_request_authentication_extensions(
     extensions: Option<RequestAuthenticationExtensions>,
     prf: Option<&PrfAuthenticationInput>,
 ) -> crate::Result<AuthenticationExtensionsClientInputs> {
-    let hmac_get_secret = match prf {
-        Some(p) => Some(HMACGetSecretInput {
-            salt1: convert_salt(p.first.clone())?,
-            salt2: p.second.clone().map(convert_salt).transpose()?,
-        }),
-        None => None,
-    };
+    // CTAP2 hmac-secret salts are derived from the browser's PRF salts; the
+    // native WebAuthn layers on the other platforms do this for us.
+    let hmac_get_secret = prf.map(|p| HMACGetSecretInput {
+        salt1: crate::prf::ctap_salt(&p.first),
+        salt2: p.second.as_deref().map(crate::prf::ctap_salt),
+    });
 
     Ok(AuthenticationExtensionsClientInputs {
         app_id: extensions.and_then(|e| e.appid),
@@ -488,22 +479,6 @@ mod tests {
     }
 
     #[test]
-    fn convert_salt_accepts_exactly_32_bytes() {
-        let salt = vec![7u8; 32];
-        let out = convert_salt(salt.clone()).unwrap();
-        assert_eq!(out.as_slice(), salt.as_slice());
-    }
-
-    #[test]
-    fn convert_salt_rejects_wrong_length_and_reports_it() {
-        let err = convert_salt(vec![0u8; 16]).unwrap_err();
-        assert!(err.to_string().contains("32 bytes"));
-        assert!(err.to_string().contains("16"));
-        assert!(convert_salt(vec![0u8; 33]).is_err());
-        assert!(convert_salt(vec![]).is_err());
-    }
-
-    #[test]
     fn convert_user_verification_maps_every_policy() {
         use webauthn_rs_proto::UserVerificationPolicy as P;
         assert_eq!(
@@ -630,31 +605,36 @@ mod tests {
         assert!(out.app_id.is_none());
     }
 
+    // SHA-256("WebAuthn PRF" || 0x00 || "salt1")
+    const SALT1_DERIVED: [u8; 32] = [
+        0x2a, 0x19, 0x90, 0xf9, 0xc9, 0xbb, 0xfe, 0x1b, 0xbf, 0x56, 0xab, 0xee, 0x2b, 0x5a, 0x0f,
+        0x59, 0xbe, 0x5f, 0x63, 0x3a, 0x35, 0xc2, 0xa5, 0xf0, 0x7d, 0x85, 0x53, 0x3e, 0xee, 0xcb,
+        0xdd, 0x3c,
+    ];
+
     #[test]
-    fn convert_request_authentication_extensions_maps_valid_prf_salts() {
-        let ext = webauthn_rs_proto::RequestAuthenticationExtensions {
-            appid: Some("https://appid.example".to_string()),
-            uvm: None,
-            hmac_get_secret: None,
-        };
+    fn authentication_extensions_derive_ctap_salts_from_browser_salts() {
         let prf = PrfAuthenticationInput {
-            first: vec![1u8; 32],
-            second: Some(vec![2u8; 32]),
+            first: b"salt1".to_vec(),
+            second: None,
         };
-        let out = convert_request_authentication_extensions(Some(ext), Some(&prf)).unwrap();
-        assert_eq!(out.app_id.as_deref(), Some("https://appid.example"));
+        let out = convert_request_authentication_extensions(None, Some(&prf)).unwrap();
         let hmac = out.hmac_get_secret.unwrap();
-        assert_eq!(hmac.salt1, [1u8; 32]);
-        assert_eq!(hmac.salt2, Some([2u8; 32]));
+        assert_eq!(hmac.salt1, SALT1_DERIVED);
+        assert!(hmac.salt2.is_none());
     }
 
     #[test]
-    fn convert_request_authentication_extensions_rejects_bad_salt_length() {
+    fn authentication_extensions_accept_salts_of_any_length() {
+        // Browser PRF salts are arbitrary length; the derivation makes them 32 bytes.
         let prf = PrfAuthenticationInput {
-            first: vec![1u8; 8], // too short for CTAP2 raw salt
-            second: None,
+            first: vec![7u8; 3],
+            second: Some(vec![9u8; 100]),
         };
-        assert!(convert_request_authentication_extensions(None, Some(&prf)).is_err());
+        let out = convert_request_authentication_extensions(None, Some(&prf)).unwrap();
+        let hmac = out.hmac_get_secret.unwrap();
+        assert_eq!(hmac.salt1, crate::prf::ctap_salt(&[7u8; 3]));
+        assert_eq!(hmac.salt2, Some(crate::prf::ctap_salt(&[9u8; 100])));
     }
 
     #[test]
