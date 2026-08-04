@@ -10,13 +10,6 @@
 //! apply the spec's derivation themselves. A backend speaking raw CTAP2 must call
 //! [`ctap_salt`] first.
 
-// `set_registration_prf_input`/`set_authentication_prf_input` (and the
-// `extensions_mut` helper behind them) are only called from `mobile.rs`, which is
-// `#[cfg(mobile)]` and so does not compile on this desktop target; `ctap_salt` is
-// unused until Task 3 wires it into the CTAP2 salt conversion. Kept `pub` for the
-// backends/tasks that do use them.
-#![allow(dead_code)]
-
 use base64::{engine::general_purpose::URL_SAFE_NO_PAD, Engine};
 use serde_json::{json, Map, Value};
 use sha2::{Digest, Sha256};
@@ -50,7 +43,18 @@ pub struct PrfAuthenticationOutput {
 /// `SHA-256(UTF8("WebAuthn PRF") || 0x00 || salt)`.
 ///
 /// Only raw-CTAP2 backends need this. Native WebAuthn layers do it internally,
-/// and applying it twice yields a different — silently wrong — secret.
+/// and applying it twice yields a different — silently wrong — secret. Used
+/// only by the Linux CTAP2 backend, so other targets would otherwise see it
+/// as dead code.
+#[cfg_attr(
+    any(
+        target_os = "android",
+        target_os = "ios",
+        target_os = "windows",
+        target_os = "macos"
+    ),
+    allow(dead_code)
+)]
 pub fn ctap_salt(salt: &[u8]) -> [u8; 32] {
     let mut hasher = Sha256::new();
     hasher.update(b"WebAuthn PRF");
@@ -113,6 +117,10 @@ pub fn authentication_input_from_options(
     }))
 }
 
+// Only called from `mobile.rs`, which is `#[cfg(mobile)]` and so does not
+// compile on desktop targets; without the attribute rustc would flag these as
+// dead code there.
+#[cfg_attr(not(mobile), allow(dead_code))]
 fn extensions_mut(options: &mut Value) -> Option<&mut Map<String, Value>> {
     let obj = options.as_object_mut()?;
     obj.entry("extensions")
@@ -121,6 +129,7 @@ fn extensions_mut(options: &mut Value) -> Option<&mut Map<String, Value>> {
 }
 
 /// Write `extensions.prf = {}` into options bound for a native WebAuthn layer.
+#[cfg_attr(not(mobile), allow(dead_code))]
 pub fn set_registration_prf_input(options: &mut Value) {
     if let Some(extensions) = extensions_mut(options) {
         extensions.insert("prf".into(), json!({}));
@@ -128,6 +137,7 @@ pub fn set_registration_prf_input(options: &mut Value) {
 }
 
 /// Write `extensions.prf.eval` into options bound for a native WebAuthn layer.
+#[cfg_attr(not(mobile), allow(dead_code))]
 pub fn set_authentication_prf_input(options: &mut Value, prf: &PrfAuthenticationInput) {
     let mut eval = Map::new();
     eval.insert("first".into(), json!(URL_SAFE_NO_PAD.encode(&prf.first)));
@@ -141,18 +151,28 @@ pub fn set_authentication_prf_input(options: &mut Value, prf: &PrfAuthentication
 
 /// Move the credential's serialized `extensions` to the browser's
 /// `clientExtensionResults` key and insert `prf` if there is one.
+///
+/// `webauthn-rs-proto`'s output extension structs have no `rename_all`/
+/// `skip_serializing_if` uniformly applied, so the raw serialization can carry
+/// `null` placeholders for extensions the client never used, and — critically —
+/// the legacy CTAP2 `hmac_get_secret`/`hmacSecret` spelling. That would leak
+/// key-derivation secret material into an undocumented field right alongside
+/// `prf`, so both are stripped here regardless of which backend produced the
+/// credential. Legitimate non-null outputs (`credProps`, a real `appid`) pass
+/// through untouched.
 fn set_client_extension_results(response: &mut Value, prf: Option<Value>) {
     let Some(obj) = response.as_object_mut() else {
         return;
     };
     let mut results = obj
         .remove("extensions")
-        .or_else(|| obj.remove("clientExtensionResults"))
         .and_then(|v| match v {
             Value::Object(map) => Some(map),
             _ => None,
         })
         .unwrap_or_default();
+    results
+        .retain(|key, value| !value.is_null() && key != "hmac_get_secret" && key != "hmacSecret");
     if let Some(prf) = prf {
         results.insert("prf".into(), prf);
     }
@@ -177,24 +197,76 @@ pub fn set_authentication_prf(response: &mut Value, prf: Option<PrfAuthenticatio
     set_client_extension_results(response, prf);
 }
 
-/// Parse the flat top-level `prf` object the Swift and Kotlin bridges resolve.
-pub fn registration_output_from_bridge(v: &Value) -> Option<PrfRegistrationOutput> {
-    let enabled = v.get("prf")?.get("enabled")?.as_bool()?;
-    Some(PrfRegistrationOutput { enabled })
+/// Enforce "unsupported PRF is web-shaped, not silent" for registration: when
+/// the caller asked for PRF and no backend produced an output, report the
+/// browser-shaped `prf.enabled = false` signal — exactly what a browser
+/// reports for an authenticator without hmac-secret — rather than omitting
+/// `prf` entirely.
+pub fn registration_output_or_disabled(
+    requested: bool,
+    output: Option<PrfRegistrationOutput>,
+) -> Option<PrfRegistrationOutput> {
+    match output {
+        Some(output) => Some(output),
+        None if requested => Some(PrfRegistrationOutput { enabled: false }),
+        None => None,
+    }
+}
+
+/// Enforce the same invariant for authentication: silently returning no secret
+/// when the caller passed salts risks unrecoverable user data, so this errors
+/// instead of letting the assertion succeed with no `prf` in the response.
+pub fn require_authentication_output(
+    requested: bool,
+    output: Option<PrfAuthenticationOutput>,
+) -> crate::Result<Option<PrfAuthenticationOutput>> {
+    match output {
+        Some(output) => Ok(Some(output)),
+        None if requested => Err(crate::Error::Unsupported(
+            "PRF was requested but this authenticator/platform did not provide it".into(),
+        )),
+        None => Ok(None),
+    }
 }
 
 /// Parse the flat top-level `prf` object the Swift and Kotlin bridges resolve.
-pub fn authentication_output_from_bridge(v: &Value) -> Option<PrfAuthenticationOutput> {
-    let prf = v.get("prf")?;
-    let decode = |key: &str| {
-        prf.get(key)
-            .and_then(Value::as_str)
-            .and_then(|s| URL_SAFE_NO_PAD.decode(s).ok())
+/// No `prf` key means the platform didn't attempt PRF (`Ok(None)`); a `prf`
+/// key present but malformed is a bridge bug and must not be mistaken for
+/// "no PRF" — it is reported as an error instead of silently discarded.
+pub fn registration_output_from_bridge(v: &Value) -> crate::Result<Option<PrfRegistrationOutput>> {
+    let Some(prf) = v.get("prf") else {
+        return Ok(None);
     };
-    Some(PrfAuthenticationOutput {
-        first: decode("first")?,
-        second: decode("second"),
-    })
+    let enabled = prf.get("enabled").and_then(Value::as_bool).ok_or_else(|| {
+        crate::Error::Authenticator("bridge prf output missing/invalid `enabled` field".into())
+    })?;
+    Ok(Some(PrfRegistrationOutput { enabled }))
+}
+
+/// Parse the flat top-level `prf` object the Swift and Kotlin bridges resolve.
+/// Same "missing key means no PRF, malformed value is an error" rule as
+/// [`registration_output_from_bridge`].
+pub fn authentication_output_from_bridge(
+    v: &Value,
+) -> crate::Result<Option<PrfAuthenticationOutput>> {
+    let Some(prf) = v.get("prf") else {
+        return Ok(None);
+    };
+    let decode = |key: &str| -> crate::Result<Option<Vec<u8>>> {
+        let Some(s) = prf.get(key).and_then(Value::as_str) else {
+            return Ok(None);
+        };
+        URL_SAFE_NO_PAD.decode(s).map(Some).map_err(|e| {
+            crate::Error::Authenticator(format!("bridge prf.{key} is not valid base64url: {e}"))
+        })
+    };
+    let Some(first) = decode("first")? else {
+        return Err(crate::Error::Authenticator(
+            "bridge prf output is missing the required `first` field".into(),
+        ));
+    };
+    let second = decode("second")?;
+    Ok(Some(PrfAuthenticationOutput { first, second }))
 }
 
 #[cfg(test)]
@@ -354,20 +426,91 @@ mod tests {
         // Both Swift bridges and the Kotlin plugin resolve a flat top-level `prf`.
         let v = json!({ "id": "cred", "prf": { "enabled": true } });
         assert_eq!(
-            registration_output_from_bridge(&v),
+            registration_output_from_bridge(&v).unwrap(),
             Some(PrfRegistrationOutput { enabled: true })
         );
 
         let v = json!({ "id": "cred", "prf": { "first": "c2VjcmV0", "second": "c2Vjb25k" } });
         assert_eq!(
-            authentication_output_from_bridge(&v),
+            authentication_output_from_bridge(&v).unwrap(),
             Some(PrfAuthenticationOutput {
                 first: b"secret".to_vec(),
                 second: Some(b"second".to_vec()),
             })
         );
 
-        assert!(registration_output_from_bridge(&json!({ "id": "cred" })).is_none());
-        assert!(authentication_output_from_bridge(&json!({ "id": "cred" })).is_none());
+        assert!(registration_output_from_bridge(&json!({ "id": "cred" }))
+            .unwrap()
+            .is_none());
+        assert!(authentication_output_from_bridge(&json!({ "id": "cred" }))
+            .unwrap()
+            .is_none());
+    }
+
+    #[test]
+    fn bridge_registration_output_errors_on_malformed_enabled() {
+        let err = registration_output_from_bridge(&json!({ "prf": { "enabled": "not-a-bool" } }))
+            .unwrap_err();
+        assert_eq!(err.kind(), "authenticator");
+    }
+
+    #[test]
+    fn bridge_authentication_output_errors_on_bad_base64() {
+        let err =
+            authentication_output_from_bridge(&json!({ "prf": { "first": "!!!" } })).unwrap_err();
+        assert_eq!(err.kind(), "authenticator");
+    }
+
+    #[test]
+    fn bridge_authentication_output_errors_when_first_missing() {
+        let err =
+            authentication_output_from_bridge(&json!({ "prf": { "second": "eA" } })).unwrap_err();
+        assert_eq!(err.kind(), "authenticator");
+    }
+
+    #[test]
+    fn registration_output_or_disabled_reports_false_when_requested_but_missing() {
+        assert_eq!(
+            registration_output_or_disabled(true, None),
+            Some(PrfRegistrationOutput { enabled: false })
+        );
+    }
+
+    #[test]
+    fn registration_output_or_disabled_passes_through_when_present() {
+        assert_eq!(
+            registration_output_or_disabled(true, Some(PrfRegistrationOutput { enabled: true })),
+            Some(PrfRegistrationOutput { enabled: true })
+        );
+    }
+
+    #[test]
+    fn registration_output_or_disabled_stays_none_when_not_requested() {
+        assert_eq!(registration_output_or_disabled(false, None), None);
+    }
+
+    #[test]
+    fn require_authentication_output_errors_when_requested_but_missing() {
+        let err = require_authentication_output(true, None).unwrap_err();
+        assert_eq!(err.kind(), "unsupported");
+    }
+
+    #[test]
+    fn require_authentication_output_passes_through_when_present() {
+        let output = PrfAuthenticationOutput {
+            first: b"secret".to_vec(),
+            second: None,
+        };
+        assert_eq!(
+            require_authentication_output(true, Some(output.clone())).unwrap(),
+            Some(output)
+        );
+    }
+
+    #[test]
+    fn require_authentication_output_ok_none_when_not_requested() {
+        assert!(require_authentication_output(false, None)
+            .unwrap()
+            .is_none());
     }
 }

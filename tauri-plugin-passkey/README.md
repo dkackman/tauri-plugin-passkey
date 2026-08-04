@@ -99,9 +99,14 @@ The PRF contract is the same on every platform:
   the browser-facing native layers do internally.
 - `prf.eval` at registration is rejected with an `"unsupported"` error; register
   with `prf: {}` and evaluate salts during authentication.
-- **Windows has no PRF support**: registration succeeds and reports
-  `prf.enabled: false`, and an assertion that requests salts fails with kind
-  `unsupported`.
+- **PRF is never silently absent.** If `prf` was requested and the platform
+  cannot provide it, registration still succeeds and reports
+  `prf.enabled: false` — the same signal a browser gives for an authenticator
+  without hmac-secret — while an assertion that requests salts fails with kind
+  `unsupported` instead of returning no secret. This is uniform across
+  platforms: **Windows** has no PRF support at all; **macOS below 15** and
+  **iOS below 18** don't expose it either; and a **CTAP2** authenticator
+  without hmac-secret hits the same rule.
 
 ## Events (Linux only)
 

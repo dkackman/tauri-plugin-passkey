@@ -23,6 +23,7 @@ pub(crate) async fn register<R: Runtime>(
 ) -> Result<Value> {
     crate::normalize::default_require_resident_key(&mut options);
     let prf = crate::prf::registration_input_from_options(&options)?;
+    let prf_requested = prf.is_some();
     let options: PublicKeyCredentialCreationOptions = serde_json::from_value(options)?;
     crate::validation::validate_rp_id(&origin, &options.rp.id)?;
     let (credential, prf_output) = block_in_place(|| {
@@ -30,6 +31,10 @@ pub(crate) async fn register<R: Runtime>(
             .register(origin, options, prf, timeout.unwrap_or(DEFAULT_TIMEOUT))
             .log()
     })?;
+    // Unsupported PRF is web-shaped, not silent: if the caller asked for PRF
+    // and no backend produced an output, report `prf.enabled = false` rather
+    // than omitting `prf` entirely.
+    let prf_output = crate::prf::registration_output_or_disabled(prf_requested, prf_output);
     let mut response = serde_json::to_value(credential)?;
     crate::prf::set_registration_prf(&mut response, prf_output);
     Ok(response)
@@ -43,6 +48,7 @@ pub(crate) async fn authenticate<R: Runtime>(
     timeout: Option<u32>,
 ) -> Result<Value> {
     let prf = crate::prf::authentication_input_from_options(&options)?;
+    let prf_requested = prf.is_some();
     let options: PublicKeyCredentialRequestOptions = serde_json::from_value(options)?;
     crate::validation::validate_rp_id(&origin, &options.rp_id)?;
     let (credential, prf_output) = block_in_place(|| {
@@ -50,6 +56,9 @@ pub(crate) async fn authenticate<R: Runtime>(
             .authenticate(origin, options, prf, timeout.unwrap_or(DEFAULT_TIMEOUT))
             .log()
     })?;
+    // Never silently return no secret: if the caller passed salts and no
+    // backend produced an output, error rather than succeed with `prf` absent.
+    let prf_output = crate::prf::require_authentication_output(prf_requested, prf_output)?;
     let mut response = serde_json::to_value(credential)?;
     crate::prf::set_authentication_prf(&mut response, prf_output);
     Ok(response)

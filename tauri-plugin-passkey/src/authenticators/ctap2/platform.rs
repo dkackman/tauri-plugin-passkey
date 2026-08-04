@@ -183,7 +183,7 @@ pub fn perform_authentication(
         user_verification_req: convert_user_verification(options.user_verification),
         use_ctap1_fallback: false,
         allow_list: convert_allow_list(options.allow_credentials),
-        extensions: convert_request_authentication_extensions(options.extensions, prf.as_ref())?,
+        extensions: convert_request_authentication_extensions(options.extensions, prf.as_ref()),
     };
 
     let (sign_tx, sign_rx) = channel();
@@ -293,21 +293,22 @@ pub fn status<R: Runtime>(
 fn convert_response_authentication_extensions(
     extensions: AuthenticationExtensionsClientOutputs,
 ) -> webauthn_rs_proto::AuthenticationExtensionsClientOutputs {
+    // PRF travels back to `commands.rs` as its own typed return value (see
+    // `perform_authentication`'s `prf_output`), not through this struct — do
+    // not also populate `hmac_get_secret` here, or the credential's serialized
+    // `extensions` carries the same secret twice under the legacy CTAP2
+    // spelling. `crate::prf::set_client_extension_results` strips any survivor
+    // as a second line of defense, but the fix belongs at the source.
     webauthn_rs_proto::AuthenticationExtensionsClientOutputs {
         appid: extensions.app_id,
-        hmac_get_secret: extensions.hmac_get_secret.map(|h| {
-            webauthn_rs_proto::HmacGetSecretOutput {
-                output1: h.output1.to_vec().into(),
-                output2: h.output2.map(|s| s.to_vec().into()),
-            }
-        }),
+        hmac_get_secret: None,
     }
 }
 
 fn convert_request_authentication_extensions(
     extensions: Option<RequestAuthenticationExtensions>,
     prf: Option<&PrfAuthenticationInput>,
-) -> crate::Result<AuthenticationExtensionsClientInputs> {
+) -> AuthenticationExtensionsClientInputs {
     // CTAP2 hmac-secret salts are derived from the browser's PRF salts; the
     // native WebAuthn layers on the other platforms do this for us.
     let hmac_get_secret = prf.map(|p| HMACGetSecretInput {
@@ -315,11 +316,11 @@ fn convert_request_authentication_extensions(
         salt2: p.second.as_deref().map(crate::prf::ctap_salt),
     });
 
-    Ok(AuthenticationExtensionsClientInputs {
+    AuthenticationExtensionsClientInputs {
         app_id: extensions.and_then(|e| e.appid),
         hmac_get_secret,
         ..Default::default()
-    })
+    }
 }
 
 fn convert_request_registration_extensions(
@@ -347,9 +348,14 @@ fn convert_request_registration_extensions(
 fn convert_response_registration_extensions(
     extensions: AuthenticationExtensionsClientOutputs,
 ) -> RegistrationExtensionsClientOutputs {
+    // PRF travels back to `commands.rs` as its own typed return value (see
+    // `perform_register`'s `prf_output`, sourced from `hmac_create_secret`
+    // just above) — do not also surface `hmac_secret` here, or the serialized
+    // credential would carry `clientExtensionResults.hmacSecret` alongside
+    // `prf.enabled` for the same fact.
     RegistrationExtensionsClientOutputs {
         appid: extensions.app_id,
-        hmac_secret: extensions.hmac_create_secret,
+        hmac_secret: None,
         cred_props: extensions
             .cred_props
             .map(|c| webauthn_rs_proto::CredProps { rk: Some(c.rk) }),
@@ -600,9 +606,21 @@ mod tests {
 
     #[test]
     fn convert_request_authentication_extensions_defaults_when_none() {
-        let out = convert_request_authentication_extensions(None, None).unwrap();
+        let out = convert_request_authentication_extensions(None, None);
         assert!(out.hmac_get_secret.is_none());
         assert!(out.app_id.is_none());
+    }
+
+    #[test]
+    fn convert_request_authentication_extensions_passes_through_appid() {
+        let ext = RequestAuthenticationExtensions {
+            appid: Some("https://example.com".to_string()),
+            uvm: None,
+            hmac_get_secret: None,
+        };
+        let out = convert_request_authentication_extensions(Some(ext), None);
+        assert_eq!(out.app_id, Some("https://example.com".to_string()));
+        assert!(out.hmac_get_secret.is_none());
     }
 
     // SHA-256("WebAuthn PRF" || 0x00 || "salt1")
@@ -618,7 +636,7 @@ mod tests {
             first: b"salt1".to_vec(),
             second: None,
         };
-        let out = convert_request_authentication_extensions(None, Some(&prf)).unwrap();
+        let out = convert_request_authentication_extensions(None, Some(&prf));
         let hmac = out.hmac_get_secret.unwrap();
         assert_eq!(hmac.salt1, SALT1_DERIVED);
         assert!(hmac.salt2.is_none());
@@ -631,7 +649,7 @@ mod tests {
             first: vec![7u8; 3],
             second: Some(vec![9u8; 100]),
         };
-        let out = convert_request_authentication_extensions(None, Some(&prf)).unwrap();
+        let out = convert_request_authentication_extensions(None, Some(&prf));
         let hmac = out.hmac_get_secret.unwrap();
         assert_eq!(hmac.salt1, crate::prf::ctap_salt(&[7u8; 3]));
         assert_eq!(hmac.salt2, Some(crate::prf::ctap_salt(&[9u8; 100])));
@@ -686,7 +704,11 @@ mod tests {
     }
 
     #[test]
-    fn convert_response_registration_extensions_maps_hmac_and_cred_props() {
+    fn convert_response_registration_extensions_maps_cred_props_but_not_hmac_secret() {
+        // `hmac_create_secret` must NOT surface as `hmac_secret` here: PRF
+        // travels back as its own typed value (`perform_register`'s
+        // `prf_output`), and re-populating this field would duplicate the
+        // secret-derivation signal under the legacy CTAP2 spelling.
         let outputs = AuthenticationExtensionsClientOutputs {
             app_id: Some(true),
             hmac_create_secret: Some(true),
@@ -695,12 +717,14 @@ mod tests {
         };
         let out = convert_response_registration_extensions(outputs);
         assert_eq!(out.appid, Some(true));
-        assert_eq!(out.hmac_secret, Some(true));
+        assert!(out.hmac_secret.is_none());
         assert_eq!(out.cred_props.map(|c| c.rk), Some(Some(true)));
     }
 
     #[test]
-    fn convert_response_authentication_extensions_maps_hmac_outputs() {
+    fn convert_response_authentication_extensions_passes_through_appid_but_not_hmac_get_secret() {
+        // Same reasoning as the registration case: `hmac_get_secret` here
+        // would duplicate the PRF secret alongside `prf.results`.
         let outputs = AuthenticationExtensionsClientOutputs {
             app_id: Some(false),
             hmac_get_secret: Some(authenticator::ctap2::server::HMACGetSecretOutput {
@@ -711,8 +735,6 @@ mod tests {
         };
         let out = convert_response_authentication_extensions(outputs);
         assert_eq!(out.appid, Some(false));
-        let hmac = out.hmac_get_secret.unwrap();
-        assert_eq!(hmac.output1.as_slice(), &[3u8; 32]);
-        assert_eq!(hmac.output2.unwrap().as_slice(), &[4u8; 32]);
+        assert!(out.hmac_get_secret.is_none());
     }
 }
