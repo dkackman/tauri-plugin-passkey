@@ -51,6 +51,22 @@ Per platform:
 
 See the full capability matrix in [tauri-plugin-passkey/README.md](./tauri-plugin-passkey/README.md#platform-support).
 
+## PRF
+
+The plugin's PRF contract is the same on every platform:
+
+- `extensions.prf` is the only accepted spelling on input; results come back in
+  `clientExtensionResults.prf` (`prf.enabled` after registration,
+  `prf.results.{first,second}` after authentication).
+- Salts may be any length and are used exactly as a browser would use them, on
+  every platform — including Linux, where the CTAP2 backend now derives the
+  hmac-secret salt as `SHA-256("WebAuthn PRF" || 0x00 || salt)` to match what
+  the browser-facing native layers do internally.
+- `prf.eval` at registration is rejected with an `"unsupported"` error; register
+  with `prf: {}` and evaluate salts during authentication.
+- Windows has no PRF support: registration succeeds and reports
+  `prf.enabled: false`, and an assertion that requests salts fails.
+
 ## Build
 
 ```bash

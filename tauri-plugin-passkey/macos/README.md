@@ -285,7 +285,7 @@ The plugin accepts the browser `prf` extension directly and returns the browser 
 "extensions": { "prf": { "eval": { "first": "<base64url salt>" } } }
 ```
 
-The recovered secret is at `assertion.clientExtensionResults.prf.results.first` (base64url). The equivalent `webauthn-rs-proto` `hmacCreateSecret` / `hmacGetSecret` shape (what server-generated options use) is also accepted and still returned as `hmac_get_secret`.
+The recovered secret is at `assertion.clientExtensionResults.prf.results.first` (base64url). `extensions.prf` is the only accepted spelling — the `webauthn-rs-proto` `hmacCreateSecret` / `hmacGetSecret` shape is not accepted; register with `prf: {}` and evaluate salts during authentication. Salts may be any length; ASAuthorization applies the browser's PRF derivation internally, so the salt you pass here is used exactly as it would be in a browser.
 
 ## Limitations
 
