@@ -43,14 +43,22 @@ final class RegistrationOptionsDecodingTests: XCTestCase {
     func testDecodesFieldsAndPrfExtension() throws {
         let json = """
         {"rp":{"id":"example.com"},"user":{"id":"AQID","name":"alice","displayName":"Alice"},
-         "challenge":"Y2hhbA","extensions":{"hmacCreateSecret":true}}
+         "challenge":"Y2hhbA","extensions":{"prf":{}}}
         """
         let opts = try decode(json)
         XCTAssertEqual(opts.rp.id, "example.com")
         XCTAssertEqual(opts.user.name, "alice")
         XCTAssertEqual(opts.user.displayName, "Alice")
         XCTAssertEqual(opts.challenge, "Y2hhbA")
-        XCTAssertEqual(opts.extensions?.hmacCreateSecret, true)
+        XCTAssertNotNil(opts.extensions?.prf)
+    }
+
+    func testDecodesRegistrationPrfRequest() throws {
+        let json = """
+        {"rp":{"id":"example.com"},"user":{"id":"dQ","name":"alice"},"challenge":"Y2g","extensions":{"prf":{}}}
+        """
+        let options = try JSONDecoder().decode(RegistrationOptions.self, from: Data(json.utf8))
+        XCTAssertNotNil(options.extensions?.prf)
     }
 
     func testDisplayNameIsOptional() throws {
@@ -78,25 +86,23 @@ final class AuthenticationOptionsDecodingTests: XCTestCase {
         try JSONDecoder().decode(AuthenticationOptions.self, from: Data(json.utf8))
     }
 
-    func testDecodesBothPrfSalts() throws {
+    func testDecodesBrowserPrfSalts() throws {
         let json = """
-        {"rpId":"example.com","challenge":"Y2hhbA",
-         "extensions":{"hmacGetSecret":{"output1":"c2FsdDE","output2":"c2FsdDI"}}}
+        {"rpId":"example.com","challenge":"Y2g","extensions":{"prf":{"eval":{"first":"c2FsdDE","second":"c2FsdDI"}}}}
         """
-        let opts = try decode(json)
-        XCTAssertEqual(opts.rpId, "example.com")
-        XCTAssertEqual(opts.extensions?.hmacGetSecret?.output1, "c2FsdDE")
-        XCTAssertEqual(opts.extensions?.hmacGetSecret?.output2, "c2FsdDI")
+        let options = try JSONDecoder().decode(AuthenticationOptions.self, from: Data(json.utf8))
+        XCTAssertEqual(options.extensions?.prf?.eval?.first, "c2FsdDE")
+        XCTAssertEqual(options.extensions?.prf?.eval?.second, "c2FsdDI")
     }
 
     func testSecondSaltIsOptional() throws {
         let json = """
         {"rpId":"example.com","challenge":"Y2hhbA",
-         "extensions":{"hmacGetSecret":{"output1":"c2FsdDE"}}}
+         "extensions":{"prf":{"eval":{"first":"c2FsdDE"}}}}
         """
         let opts = try decode(json)
-        XCTAssertEqual(opts.extensions?.hmacGetSecret?.output1, "c2FsdDE")
-        XCTAssertNil(opts.extensions?.hmacGetSecret?.output2)
+        XCTAssertEqual(opts.extensions?.prf?.eval?.first, "c2FsdDE")
+        XCTAssertNil(opts.extensions?.prf?.eval?.second)
     }
 
     func testMissingRpIdThrows() {
