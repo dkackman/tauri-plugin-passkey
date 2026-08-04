@@ -6,13 +6,13 @@ The plugin talks to each platform's native passkey API (ASAuthorization on Apple
 
 ## Platform support
 
-| Capability                          | Linux | macOS 14+       | iOS 17.4+       | Android 9+      | Windows 10 1903+ |
-| ----------------------------------- | ----- | --------------- | --------------- | --------------- | ---------------- |
-| `register` / `authenticate`         | ✅    | ✅              | ✅              | ✅              | ✅               |
-| PRF / hmac-secret extension         | ✅    | ✅              | ✅ (iOS 18+)    | ✅              | ✅               |
-| Credential discovery (usernameless) | ✅    | ✅              | ✅              | ✅              | ❌               |
-| `cancel`                            | ✅    | ✅              | ✅              | ✅              | ❌ (no-op)       |
-| `sendPin` / `selectKey` / events    | ✅    | n/a — native UI | n/a — native UI | n/a — native UI | n/a — native UI  |
+| Capability                          | Linux | macOS 14+       | iOS 17.4+       | Android 9+      | Windows 10 1903+     |
+| ----------------------------------- | ----- | --------------- | --------------- | --------------- | -------------------- |
+| `register` / `authenticate`         | ✅    | ✅              | ✅              | ✅              | ✅                   |
+| PRF / hmac-secret extension         | ✅    | ✅              | ✅ (iOS 18+)    | ✅              | ❌ (see [PRF](#prf)) |
+| Credential discovery (usernameless) | ✅    | ✅              | ✅              | ✅              | ❌                   |
+| `cancel`                            | ✅    | ✅              | ✅              | ✅              | ❌ (no-op)           |
+| `sendPin` / `selectKey` / events    | ✅    | n/a — native UI | n/a — native UI | n/a — native UI | n/a — native UI      |
 
 On everything except Linux, the operating system shows its own passkey UI (Touch ID / Face ID / Windows Hello / Android sheet), so PIN entry, device selection, and progress events never reach your app. On Linux the plugin drives a CTAP2 authenticator directly and surfaces those interactions as [events](#events-linux-only).
 
@@ -84,7 +84,24 @@ Every rejected promise carries a `PasskeyError`:
 }
 ```
 
-Current kinds: `validation` (origin/rpId mismatch and similar precondition failures), `authenticator` (the ceremony failed or was declined), `platform` (native API error), `noToken`, `io`, `serialization`. The set is non-exhaustive — new kinds may be added in minor releases, so treat unknown kinds as generic failures. `message` is display text; do not parse it.
+Current kinds: `validation` (origin/rpId mismatch and similar precondition failures), `authenticator` (the ceremony failed or was declined), `platform` (native API error), `noToken`, `io`, `serialization`, `unsupported` (a request the platform cannot fulfill by design — see [PRF](#prf)'s note on Windows and `prf.eval` at registration, and `residentKey: "discouraged"` on Android). The set is non-exhaustive — new kinds may be added in minor releases, so treat unknown kinds as generic failures. `message` is display text; do not parse it.
+
+## PRF
+
+The PRF contract is the same on every platform:
+
+- `extensions.prf` is the only accepted spelling on input; results come back in
+  `clientExtensionResults.prf` (`prf.enabled` after registration,
+  `prf.results.{first,second}` after authentication).
+- Salts may be any length and are used exactly as a browser would use them, on
+  every platform — including Linux, where the CTAP2 backend derives the
+  hmac-secret salt as `SHA-256("WebAuthn PRF" || 0x00 || salt)` to match what
+  the browser-facing native layers do internally.
+- `prf.eval` at registration is rejected with an `"unsupported"` error; register
+  with `prf: {}` and evaluate salts during authentication.
+- **Windows has no PRF support**: registration succeeds and reports
+  `prf.enabled: false`, and an assertion that requests salts fails with kind
+  `unsupported`.
 
 ## Events (Linux only)
 
