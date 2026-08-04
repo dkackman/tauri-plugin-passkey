@@ -20,6 +20,8 @@ pub enum Error {
     Validation(String),
     #[error("Authenticator error: {0}")]
     Authenticator(String),
+    #[error("Unsupported on this platform: {0}")]
+    Unsupported(String),
     #[cfg(not(any(
         target_os = "android",
         target_os = "ios",
@@ -52,6 +54,7 @@ impl Error {
             Error::NoToken => "noToken",
             Error::Validation(_) => "validation",
             Error::Authenticator(_) => "authenticator",
+            Error::Unsupported(_) => "unsupported",
             #[cfg(not(any(
                 target_os = "android",
                 target_os = "ios",

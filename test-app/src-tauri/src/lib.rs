@@ -127,18 +127,15 @@ fn build_webauthn(rp_id: &str, rp_origin: &str) -> Result<Webauthn, String> {
     builder.build().log_err("Failed to build Webauthn")
 }
 
-use base64::{engine::general_purpose::URL_SAFE_NO_PAD, Engine};
 use tauri_plugin_log::{RotationStrategy, Target, TargetKind, TimezoneStrategy};
 use webauthn_rs::{
     prelude::{
-        Base64UrlSafeData, DiscoverableAuthentication, Passkey, PasskeyAuthentication,
-        PasskeyRegistration, Uuid,
+        DiscoverableAuthentication, Passkey, PasskeyAuthentication, PasskeyRegistration, Uuid,
     },
     Webauthn, WebauthnBuilder,
 };
 use webauthn_rs_proto::{
-    PublicKeyCredential, PublicKeyCredentialCreationOptions, PublicKeyCredentialRequestOptions,
-    RegisterPublicKeyCredential,
+    PublicKeyCredential, PublicKeyCredentialRequestOptions, RegisterPublicKeyCredential,
 };
 
 #[tauri::command]
@@ -149,7 +146,7 @@ async fn reg_start(
     users: State<'_, Mutex<HashMap<String, Uuid>>>,
     name: &str,
     enable_prf: bool,
-) -> Result<PublicKeyCredentialCreationOptions, String> {
+) -> Result<serde_json::Value, String> {
     let uuid = *users
         .lock()
         .await
@@ -170,15 +167,13 @@ async fn reg_start(
 
     state.lock().await.replace((state_val, uuid));
 
-    let mut public_key = challenge.public_key;
+    let public_key = challenge.public_key;
+    let mut options = serde_json::to_value(&public_key).log_err("Failed to serialize options")?;
     if enable_prf {
-        public_key.extensions = Some(webauthn_rs_proto::RequestRegistrationExtensions {
-            hmac_create_secret: Some(true),
-            ..Default::default()
-        });
+        options["extensions"] = serde_json::json!({ "prf": {} });
     }
 
-    Ok(public_key)
+    Ok(options)
 }
 
 #[tauri::command]
@@ -212,13 +207,33 @@ async fn reg_finish(
     Ok(())
 }
 
+/// Serializes `public_key` to the browser JSON shape and, if a first salt was
+/// provided, attaches `extensions.prf.eval` for the plugin's browser PRF
+/// contract. Shared by the discoverable and non-discoverable auth-start
+/// commands.
+fn options_with_prf_eval(
+    public_key: &PublicKeyCredentialRequestOptions,
+    salt1: Option<String>,
+    salt2: Option<String>,
+) -> Result<serde_json::Value, String> {
+    let mut options = serde_json::to_value(public_key).log_err("Failed to serialize options")?;
+    if let Some(first) = salt1 {
+        let mut eval = serde_json::json!({ "first": first });
+        if let Some(second) = salt2 {
+            eval["second"] = serde_json::json!(second);
+        }
+        options["extensions"] = serde_json::json!({ "prf": { "eval": eval } });
+    }
+    Ok(options)
+}
+
 #[tauri::command]
 async fn auth_start(
     webauthn: State<'_, Mutex<Webauthn>>,
     state: State<'_, Mutex<Option<DiscoverableAuthentication>>>,
     salt1: Option<String>,
     salt2: Option<String>,
-) -> Result<PublicKeyCredentialRequestOptions, String> {
+) -> Result<serde_json::Value, String> {
     let (challenge, state_val) = webauthn
         .lock()
         .await
@@ -227,34 +242,7 @@ async fn auth_start(
 
     state.lock().await.replace(state_val);
 
-    let mut public_key = challenge.public_key;
-    if let Some(s1) = salt1 {
-        let salts = if let Some(s2) = salt2 {
-            vec![s1, s2]
-        } else {
-            vec![s1]
-        };
-        let decode_salt = |s: &str| -> Result<Base64UrlSafeData, String> {
-            let bytes = URL_SAFE_NO_PAD.decode(s).log_err("Invalid salt encoding")?;
-            if bytes.len() != 32 {
-                return Err(format!(
-                    "PRF salt must be exactly 32 bytes, got {}",
-                    bytes.len()
-                ));
-            }
-            Ok(Base64UrlSafeData::from(bytes))
-        };
-        public_key.extensions = Some(webauthn_rs_proto::RequestAuthenticationExtensions {
-            hmac_get_secret: Some(webauthn_rs_proto::HmacGetSecretInput {
-                output1: decode_salt(&salts[0])?,
-                output2: salts.get(1).map(|s| decode_salt(s)).transpose()?,
-            }),
-            appid: None,
-            uvm: None,
-        });
-    }
-
-    Ok(public_key)
+    options_with_prf_eval(&challenge.public_key, salt1, salt2)
 }
 
 #[tauri::command]
@@ -266,7 +254,7 @@ async fn auth_start_non_discoverable(
     name: &str,
     salt1: Option<String>,
     salt2: Option<String>,
-) -> Result<PublicKeyCredentialRequestOptions, String> {
+) -> Result<serde_json::Value, String> {
     let uuid = *users
         .lock()
         .await
@@ -288,40 +276,42 @@ async fn auth_start_non_discoverable(
 
     state.lock().await.replace(state_val);
 
-    let mut public_key = challenge.public_key;
-    if let Some(s1) = salt1 {
-        let salts = if let Some(s2) = salt2 {
-            vec![s1, s2]
-        } else {
-            vec![s1]
-        };
-        let decode_salt = |s: &str| -> Result<Base64UrlSafeData, String> {
-            let bytes = URL_SAFE_NO_PAD.decode(s).log_err("Invalid salt encoding")?;
-            if bytes.len() != 32 {
-                return Err(format!(
-                    "PRF salt must be exactly 32 bytes, got {}",
-                    bytes.len()
-                ));
-            }
-            Ok(Base64UrlSafeData::from(bytes))
-        };
-        public_key.extensions = Some(webauthn_rs_proto::RequestAuthenticationExtensions {
-            hmac_get_secret: Some(webauthn_rs_proto::HmacGetSecretInput {
-                output1: decode_salt(&salts[0])?,
-                output2: salts.get(1).map(|s| decode_salt(s)).transpose()?,
-            }),
-            appid: None,
-            uvm: None,
-        });
-    }
-
-    Ok(public_key)
+    options_with_prf_eval(&challenge.public_key, salt1, salt2)
 }
 
 #[derive(Serialize, Deserialize)]
 struct PrfResults {
     first: String,
     second: Option<String>,
+}
+
+/// Pulls the browser PRF results out of `clientExtensionResults.prf.results`
+/// before `response` is converted into `PublicKeyCredential` for signature
+/// verification. Shared by the discoverable and non-discoverable auth-finish
+/// commands.
+///
+/// Note: this field is NOT covered by the authenticator's signature per the
+/// WebAuthn spec. On every backend (macOS/iOS's native bridge, Android's
+/// Credential Manager, and Linux's direct CTAP2 authenticator) the plugin
+/// constructs this from the platform-verified PRF output, so it is
+/// trustworthy in practice. A tampered Tauri frontend could inject arbitrary
+/// values here.
+fn extract_prf_results(response: &serde_json::Value) -> Option<PrfResults> {
+    response
+        .get("clientExtensionResults")
+        .and_then(|e| e.get("prf"))
+        .and_then(|prf| prf.get("results"))
+        .map(|results| PrfResults {
+            first: results
+                .get("first")
+                .and_then(|v| v.as_str())
+                .unwrap_or_default()
+                .to_string(),
+            second: results
+                .get("second")
+                .and_then(|v| v.as_str())
+                .map(str::to_string),
+        })
 }
 
 #[tauri::command]
@@ -332,8 +322,12 @@ async fn auth_finish(
     passkeys: State<'_, Mutex<HashMap<Uuid, Vec<Passkey>>>>,
     users: State<'_, Mutex<HashMap<String, Uuid>>>,
     config: State<'_, Mutex<RpConfig>>,
-    response: PublicKeyCredential,
+    response: serde_json::Value,
 ) -> Result<Option<PrfResults>, String> {
+    let prf_results = extract_prf_results(&response);
+    let response: PublicKeyCredential =
+        serde_json::from_value(response).log_err("Invalid authentication response")?;
+
     let (user, cred_id) = webauthn
         .lock()
         .await
@@ -371,23 +365,6 @@ async fn auth_finish(
         save_rp_store(&app, &rp_id, &*users.lock().await, &passkeys)?;
     }
 
-    // Extract PRF results from clientExtensionResults. Note: this field is NOT
-    // covered by the authenticator's signature per the WebAuthn spec. On macOS/iOS
-    // the native bridge constructs this from the platform-verified PRF output,
-    // so it is trustworthy in practice. A tampered Tauri frontend could inject
-    // arbitrary values here.
-    let prf_results = response
-        .extensions
-        .hmac_get_secret
-        .as_ref()
-        .map(|hmac| PrfResults {
-            first: URL_SAFE_NO_PAD.encode(hmac.output1.as_ref()),
-            second: hmac
-                .output2
-                .as_ref()
-                .map(|s| URL_SAFE_NO_PAD.encode(s.as_ref())),
-        });
-
     Ok(prf_results)
 }
 
@@ -399,8 +376,12 @@ async fn auth_finish_non_discoverable(
     passkeys: State<'_, Mutex<HashMap<Uuid, Vec<Passkey>>>>,
     users: State<'_, Mutex<HashMap<String, Uuid>>>,
     config: State<'_, Mutex<RpConfig>>,
-    response: PublicKeyCredential,
+    response: serde_json::Value,
 ) -> Result<Option<PrfResults>, String> {
+    let prf_results = extract_prf_results(&response);
+    let response: PublicKeyCredential =
+        serde_json::from_value(response).log_err("Invalid authentication response")?;
+
     let passkey_auth = state
         .lock()
         .await
@@ -422,23 +403,6 @@ async fn auth_finish_non_discoverable(
         let rp_id = config.lock().await.rp_id.clone();
         save_rp_store(&app, &rp_id, &*users.lock().await, &passkeys)?;
     }
-
-    // Extract PRF results from clientExtensionResults. Note: this field is NOT
-    // covered by the authenticator's signature per the WebAuthn spec. On macOS/iOS
-    // the native bridge constructs this from the platform-verified PRF output,
-    // so it is trustworthy in practice. A tampered Tauri frontend could inject
-    // arbitrary values here.
-    let prf_results = response
-        .extensions
-        .hmac_get_secret
-        .as_ref()
-        .map(|hmac| PrfResults {
-            first: URL_SAFE_NO_PAD.encode(hmac.output1.as_ref()),
-            second: hmac
-                .output2
-                .as_ref()
-                .map(|s| URL_SAFE_NO_PAD.encode(s.as_ref())),
-        });
 
     Ok(prf_results)
 }
@@ -524,6 +488,7 @@ pub fn run() {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use base64::{engine::general_purpose::URL_SAFE_NO_PAD, Engine};
 
     /// The Android origin the local verifier allows has to be derived from the same
     /// signing cert that webauthn.dkackman.com's assetlinks.json publishes — otherwise

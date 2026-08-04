@@ -31,3 +31,6 @@ test-app/embedded.provisionprofile
 
 *.provisionprofile
 *.mobileprovision
+
+# TypeScript incremental build artifacts
+*.tsbuildinfo

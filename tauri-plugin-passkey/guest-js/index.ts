@@ -79,6 +79,12 @@ export type PasskeyErrorKind =
   | "noToken"
   | "validation"
   | "authenticator"
+  // Raised for a request the platform cannot fulfill by design, not by
+  // failure: PRF on Windows (no PRF support at all), `prf.eval` at
+  // registration (evaluate salts during authentication instead), and
+  // `residentKey: "discouraged"` on Android (Credential Manager only
+  // creates discoverable credentials).
+  | "unsupported"
   | (string & {});
 
 /**

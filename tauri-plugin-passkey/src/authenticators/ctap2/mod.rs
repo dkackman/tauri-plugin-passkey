@@ -12,6 +12,10 @@ use webauthn_rs_proto::{
     RegisterPublicKeyCredential,
 };
 
+use crate::prf::{
+    PrfAuthenticationInput, PrfAuthenticationOutput, PrfRegistrationInput, PrfRegistrationOutput,
+};
+
 use super::Authenticator;
 
 mod event;
@@ -45,9 +49,9 @@ impl<R: Runtime> Authenticator<R> for Webauthn<R> {
         &self,
         origin: Url,
         options: PublicKeyCredentialCreationOptions,
+        prf: Option<PrfRegistrationInput>,
         timeout: u32,
-    ) -> crate::Result<RegisterPublicKeyCredential> {
-        // `options.extensions` can carry PRF inputs — log identifiers only.
+    ) -> crate::Result<(RegisterPublicKeyCredential, Option<PrfRegistrationOutput>)> {
         #[cfg(feature = "log")]
         log::info!("Registering for rp_id={}", options.rp.id);
         platform::perform_register(
@@ -55,6 +59,7 @@ impl<R: Runtime> Authenticator<R> for Webauthn<R> {
             self.status_tx.clone(),
             origin,
             options,
+            prf,
             timeout as u64,
         )
         .map_err(|e| {
@@ -69,9 +74,10 @@ impl<R: Runtime> Authenticator<R> for Webauthn<R> {
         &self,
         origin: Url,
         options: PublicKeyCredentialRequestOptions,
+        prf: Option<PrfAuthenticationInput>,
         timeout: u32,
-    ) -> crate::Result<PublicKeyCredential> {
-        // `options.extensions` carries the PRF salts — log identifiers only.
+    ) -> crate::Result<(PublicKeyCredential, Option<PrfAuthenticationOutput>)> {
+        // `prf` carries the browser salts — log identifiers only.
         #[cfg(feature = "log")]
         log::debug!("Authenticating for rp_id={}", options.rp_id);
         platform::perform_authentication(
@@ -79,6 +85,7 @@ impl<R: Runtime> Authenticator<R> for Webauthn<R> {
             self.status_tx.clone(),
             origin,
             options,
+            prf,
             timeout as u64,
         )
         .map_err(|e| {

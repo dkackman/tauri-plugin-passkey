@@ -49,7 +49,7 @@ Per platform:
   `PATH` from Homebrew or `~/.ktlint` is a different version that will disagree with CI.
 - **Windows** — Visual Studio Build Tools and the Windows SDK, for Windows Hello/CTAP2
 
-See the full capability matrix in [tauri-plugin-passkey/README.md](./tauri-plugin-passkey/README.md#platform-support).
+See the full capability matrix in [tauri-plugin-passkey/README.md](./tauri-plugin-passkey/README.md#platform-support). The PRF/hmac-secret contract (accepted spelling, salt handling, Windows' lack of support) is documented in [tauri-plugin-passkey/README.md#prf](./tauri-plugin-passkey/README.md#prf).
 
 ## Build
 

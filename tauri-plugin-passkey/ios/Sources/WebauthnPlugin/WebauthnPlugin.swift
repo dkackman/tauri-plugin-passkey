@@ -9,7 +9,7 @@ struct RegistrationOptions: Decodable {
     let rp: RelyingParty
     let user: User
     let challenge: String
-    let extensions: RegistrationExtensions?
+    let extensions: Extensions?
     let excludeCredentials: [CredentialDescriptor]?
 
     struct RelyingParty: Decodable {
@@ -26,10 +26,9 @@ struct RegistrationOptions: Decodable {
         let id: String
     }
 
-    /// webauthn-rs-proto serializes RequestRegistrationExtensions with
-    /// #[serde(rename_all = "camelCase")], so the wire key is `hmacCreateSecret`.
-    struct RegistrationExtensions: Decodable {
-        let hmacCreateSecret: Bool?
+    /// The Rust side sends the browser `prf` extension verbatim.
+    struct Extensions: Decodable {
+        let prf: PrfInput?
     }
 }
 
@@ -37,20 +36,24 @@ struct AuthenticationOptions: Decodable {
     let rpId: String
     let challenge: String
     let allowCredentials: [CredentialDescriptor]?
-    let extensions: AuthenticationExtensions?
+    let extensions: Extensions?
 
     struct CredentialDescriptor: Decodable {
         let id: String
     }
 
-    /// See RegistrationExtensions: the wire key is `hmacGetSecret`.
-    struct AuthenticationExtensions: Decodable {
-        let hmacGetSecret: HmacGetSecretInput?
+    /// The Rust side sends the browser `prf` extension verbatim.
+    struct Extensions: Decodable {
+        let prf: PrfInput?
     }
+}
 
-    struct HmacGetSecretInput: Decodable {
-        let output1: String // base64url-encoded salt
-        let output2: String? // optional second salt
+struct PrfInput: Decodable {
+    let eval: Eval?
+
+    struct Eval: Decodable {
+        let first: String // base64url-encoded salt
+        let second: String? // optional second salt
     }
 }
 
@@ -85,7 +88,7 @@ class WebauthnPlugin: Plugin {
             return
         }
 
-        let prfEnabled = options.extensions?.hmacCreateSecret ?? false
+        let prfEnabled = options.extensions?.prf != nil
         let excluded = (options.excludeCredentials ?? []).compactMap { base64URLDecode($0.id) }
 
         Task { @MainActor in
@@ -127,9 +130,9 @@ class WebauthnPlugin: Plugin {
         let credentials = options.allowCredentials ?? []
         let allowedCredentialData = credentials.compactMap { base64URLDecode($0.id) }
 
-        // Extract PRF salts from extensions
-        let prfSalt1 = options.extensions?.hmacGetSecret.flatMap { base64URLDecode($0.output1) }
-        let prfSalt2 = options.extensions?.hmacGetSecret?.output2.flatMap { base64URLDecode($0) }
+        // ASAuthorization applies the WebAuthn PRF derivation to these salts itself.
+        let prfSalt1 = options.extensions?.prf?.eval.flatMap { base64URLDecode($0.first) }
+        let prfSalt2 = options.extensions?.prf?.eval?.second.flatMap { base64URLDecode($0) }
 
         Task { @MainActor in
             let handler = PasskeyHandler()

@@ -9,9 +9,14 @@ use base64urlsafedata::Base64UrlSafeData;
 use serde::de::DeserializeOwned;
 use tauri::{plugin::PluginApi, AppHandle, Runtime, Url};
 use webauthn_rs_proto::{
-    AuthenticatorAssertionResponseRaw, AuthenticatorAttestationResponseRaw, HmacGetSecretOutput,
-    PublicKeyCredential, PublicKeyCredentialCreationOptions, PublicKeyCredentialRequestOptions,
+    AuthenticatorAssertionResponseRaw, AuthenticatorAttestationResponseRaw, PublicKeyCredential,
+    PublicKeyCredentialCreationOptions, PublicKeyCredentialRequestOptions,
     RegisterPublicKeyCredential,
+};
+
+use crate::prf::{
+    self, PrfAuthenticationInput, PrfAuthenticationOutput, PrfRegistrationInput,
+    PrfRegistrationOutput,
 };
 
 use super::Authenticator;
@@ -72,8 +77,9 @@ impl<R: Runtime> Authenticator<R> for Webauthn<R> {
         &self,
         _origin: Url,
         options: PublicKeyCredentialCreationOptions,
+        prf: Option<PrfRegistrationInput>,
         timeout: u32,
-    ) -> crate::Result<RegisterPublicKeyCredential> {
+    ) -> crate::Result<(RegisterPublicKeyCredential, Option<PrfRegistrationOutput>)> {
         let domain = to_cstring(options.rp.id.as_str())?;
         let challenge = options.challenge.as_slice();
         let username = to_cstring(options.user.name.as_str())?;
@@ -100,17 +106,7 @@ impl<R: Runtime> Authenticator<R> for Webauthn<R> {
             .unwrap_or(std::ptr::null());
         let user_id = options.user.id.as_slice();
 
-        // Check if PRF/hmac-secret was requested
-        let prf_enabled: u8 = if options
-            .extensions
-            .as_ref()
-            .and_then(|e| e.hmac_create_secret)
-            == Some(true)
-        {
-            1
-        } else {
-            0
-        };
+        let prf_enabled: u8 = u8::from(prf.is_some());
 
         let (sender, receiver) = mpsc::channel::<Result<String, String>>();
         let context = Box::into_raw(Box::new(sender)) as u64;
@@ -132,7 +128,11 @@ impl<R: Runtime> Authenticator<R> for Webauthn<R> {
         }
 
         let json = await_swift_result(receiver, timeout)?;
-        parse_registration_response(&json)
+        let v: serde_json::Value = serde_json::from_str(&json)?;
+        Ok((
+            parse_registration_response(&v)?,
+            prf::registration_output_from_bridge(&v)?,
+        ))
     }
 
     /// Authenticate using macOS passkeys.
@@ -140,8 +140,9 @@ impl<R: Runtime> Authenticator<R> for Webauthn<R> {
         &self,
         _origin: Url,
         options: PublicKeyCredentialRequestOptions,
+        prf: Option<PrfAuthenticationInput>,
         timeout: u32,
-    ) -> crate::Result<PublicKeyCredential> {
+    ) -> crate::Result<(PublicKeyCredential, Option<PrfAuthenticationOutput>)> {
         let domain = to_cstring(options.rp_id.as_str())?;
         let challenge = options.challenge.as_slice();
 
@@ -168,19 +169,17 @@ impl<R: Runtime> Authenticator<R> for Webauthn<R> {
             .map(|c| c.as_ptr())
             .unwrap_or(std::ptr::null());
 
-        // Extract PRF salt from extensions (hmac_get_secret input)
-        let prf_salt = options
-            .extensions
+        // ASAuthorization applies the WebAuthn PRF derivation itself, so the
+        // browser-level salts go across the FFI boundary unchanged.
+        let (salt1_ptr, salt1_len) = prf
             .as_ref()
-            .and_then(|e| e.hmac_get_secret.as_ref());
-
-        let (salt1_ptr, salt1_len) = prf_salt
-            .map(|s| (s.output1.as_slice().as_ptr(), s.output1.len()))
+            .map(|p| (p.first.as_ptr(), p.first.len()))
             .unwrap_or((std::ptr::null(), 0));
 
-        let (salt2_ptr, salt2_len) = prf_salt
-            .and_then(|s| s.output2.as_ref())
-            .map(|s| (s.as_slice().as_ptr(), s.len()))
+        let (salt2_ptr, salt2_len) = prf
+            .as_ref()
+            .and_then(|p| p.second.as_ref())
+            .map(|s| (s.as_ptr(), s.len()))
             .unwrap_or((std::ptr::null(), 0));
 
         let (sender, receiver) = mpsc::channel::<Result<String, String>>();
@@ -202,7 +201,11 @@ impl<R: Runtime> Authenticator<R> for Webauthn<R> {
         }
 
         let json = await_swift_result(receiver, timeout)?;
-        parse_authentication_response(&json)
+        let v: serde_json::Value = serde_json::from_str(&json)?;
+        Ok((
+            parse_authentication_response(&v)?,
+            prf::authentication_output_from_bridge(&v)?,
+        ))
     }
 
     fn cancel(&self) {
@@ -266,23 +269,15 @@ fn json_bytes(v: &serde_json::Value, key: &str) -> crate::Result<Vec<u8>> {
     )))?)
 }
 
-fn parse_registration_response(json: &str) -> crate::Result<RegisterPublicKeyCredential> {
-    let v: serde_json::Value = serde_json::from_str(json)?;
-
-    let id = json_str(&v, "id")?;
-    let raw_id = json_bytes(&v, "rawId")?;
+fn parse_registration_response(
+    v: &serde_json::Value,
+) -> crate::Result<RegisterPublicKeyCredential> {
+    let id = json_str(v, "id")?;
+    let raw_id = json_bytes(v, "rawId")?;
 
     let response = &v["response"];
     let attestation_object = json_bytes(response, "attestationObject")?;
     let client_data_json = json_bytes(response, "clientDataJSON")?;
-
-    // Parse PRF registration result: {"prf": {"enabled": true/false}}
-    let mut extensions = webauthn_rs_proto::RegistrationExtensionsClientOutputs::default();
-    if let Some(prf) = v.get("prf") {
-        if let Some(enabled) = prf.get("enabled").and_then(|v| v.as_bool()) {
-            extensions.hmac_secret = Some(enabled);
-        }
-    }
 
     Ok(RegisterPublicKeyCredential {
         id,
@@ -293,15 +288,13 @@ fn parse_registration_response(json: &str) -> crate::Result<RegisterPublicKeyCre
             transports: None,
         },
         type_: "public-key".to_string(),
-        extensions,
+        extensions: Default::default(),
     })
 }
 
-fn parse_authentication_response(json: &str) -> crate::Result<PublicKeyCredential> {
-    let v: serde_json::Value = serde_json::from_str(json)?;
-
-    let id = json_str(&v, "id")?;
-    let raw_id = json_bytes(&v, "rawId")?;
+fn parse_authentication_response(v: &serde_json::Value) -> crate::Result<PublicKeyCredential> {
+    let id = json_str(v, "id")?;
+    let raw_id = json_bytes(v, "rawId")?;
 
     let response = &v["response"];
     let authenticator_data = json_bytes(response, "authenticatorData")?;
@@ -310,26 +303,6 @@ fn parse_authentication_response(json: &str) -> crate::Result<PublicKeyCredentia
     let user_handle = response["userHandle"]
         .as_str()
         .and_then(|s| base64_url_decode(s).ok());
-
-    // Parse PRF assertion result: {"prf": {"first": "base64url", "second": "base64url"}}
-    let mut extensions = webauthn_rs_proto::AuthenticationExtensionsClientOutputs::default();
-    if let Some(prf) = v.get("prf") {
-        let first = prf
-            .get("first")
-            .and_then(|v| v.as_str())
-            .and_then(|s| base64_url_decode(s).ok());
-        let second = prf
-            .get("second")
-            .and_then(|v| v.as_str())
-            .and_then(|s| base64_url_decode(s).ok());
-
-        if let Some(first) = first {
-            extensions.hmac_get_secret = Some(HmacGetSecretOutput {
-                output1: Base64UrlSafeData::from(first),
-                output2: second.map(Base64UrlSafeData::from),
-            });
-        }
-    }
 
     Ok(PublicKeyCredential {
         id,
@@ -341,7 +314,7 @@ fn parse_authentication_response(json: &str) -> crate::Result<PublicKeyCredentia
             user_handle: user_handle.map(Base64UrlSafeData::from),
         },
         type_: "public-key".to_string(),
-        extensions,
+        extensions: Default::default(),
     })
 }
 
@@ -395,15 +368,19 @@ mod tests {
             base64_url_encode(&att),
             base64_url_encode(&cdj),
         );
+        let v: serde_json::Value = serde_json::from_str(&json).unwrap();
 
-        let parsed = parse_registration_response(&json).unwrap();
+        let parsed = parse_registration_response(&v).unwrap();
 
         assert_eq!(parsed.id, "credA");
         assert_eq!(parsed.raw_id.as_slice(), &raw_id);
         assert_eq!(parsed.response.attestation_object.as_slice(), &att);
         assert_eq!(parsed.response.client_data_json.as_slice(), &cdj);
         assert_eq!(parsed.type_, "public-key");
-        assert_eq!(parsed.extensions.hmac_secret, Some(true));
+        assert_eq!(
+            prf::registration_output_from_bridge(&v).unwrap(),
+            Some(PrfRegistrationOutput { enabled: true })
+        );
     }
 
     #[test]
@@ -414,10 +391,11 @@ mod tests {
             base64_url_encode(&[2u8]),
             base64_url_encode(&[3u8]),
         );
+        let v: serde_json::Value = serde_json::from_str(&json).unwrap();
 
-        let parsed = parse_registration_response(&json).unwrap();
+        parse_registration_response(&v).unwrap();
 
-        assert_eq!(parsed.extensions.hmac_secret, None);
+        assert!(prf::registration_output_from_bridge(&v).unwrap().is_none());
     }
 
     #[test]
@@ -428,8 +406,9 @@ mod tests {
             base64_url_encode(&[2u8]),
             base64_url_encode(&[3u8]),
         );
+        let v: serde_json::Value = serde_json::from_str(&json).unwrap();
 
-        let err = parse_registration_response(&json).unwrap_err();
+        let err = parse_registration_response(&v).unwrap_err();
         assert!(err.to_string().contains("Missing JSON field: id"));
     }
 
@@ -452,8 +431,9 @@ mod tests {
             base64_url_encode(&prf_first),
             base64_url_encode(&prf_second),
         );
+        let v: serde_json::Value = serde_json::from_str(&json).unwrap();
 
-        let parsed = parse_authentication_response(&json).unwrap();
+        let parsed = parse_authentication_response(&v).unwrap();
 
         assert_eq!(parsed.id, "credC");
         assert_eq!(parsed.raw_id.as_slice(), &raw_id);
@@ -462,9 +442,9 @@ mod tests {
             parsed.response.user_handle.as_ref().unwrap().as_slice(),
             &user_handle
         );
-        let hmac = parsed.extensions.hmac_get_secret.unwrap();
-        assert_eq!(hmac.output1.as_slice(), &prf_first);
-        assert_eq!(hmac.output2.unwrap().as_slice(), &prf_second);
+        let prf_output = prf::authentication_output_from_bridge(&v).unwrap().unwrap();
+        assert_eq!(prf_output.first, prf_first);
+        assert_eq!(prf_output.second.as_deref(), Some(&prf_second[..]));
     }
 
     #[test]
@@ -478,14 +458,15 @@ mod tests {
             base64_url_encode(&[4u8]),
             base64_url_encode(&prf_first),
         );
+        let v: serde_json::Value = serde_json::from_str(&json).unwrap();
 
-        let parsed = parse_authentication_response(&json).unwrap();
+        let parsed = parse_authentication_response(&v).unwrap();
 
         // No userHandle in the JSON -> None.
         assert!(parsed.response.user_handle.is_none());
-        let hmac = parsed.extensions.hmac_get_secret.unwrap();
-        assert_eq!(hmac.output1.as_slice(), &prf_first);
-        assert!(hmac.output2.is_none());
+        let prf_output = prf::authentication_output_from_bridge(&v).unwrap().unwrap();
+        assert_eq!(prf_output.first, prf_first);
+        assert!(prf_output.second.is_none());
     }
 
     #[test]
@@ -497,9 +478,27 @@ mod tests {
             base64_url_encode(&[3u8]),
             base64_url_encode(&[4u8]),
         );
+        let v: serde_json::Value = serde_json::from_str(&json).unwrap();
 
-        let parsed = parse_authentication_response(&json).unwrap();
+        parse_authentication_response(&v).unwrap();
 
-        assert!(parsed.extensions.hmac_get_secret.is_none());
+        assert!(prf::authentication_output_from_bridge(&v)
+            .unwrap()
+            .is_none());
+    }
+
+    #[test]
+    fn authentication_response_with_malformed_prf_first_errors() {
+        let json = format!(
+            r#"{{"id":"credF","rawId":"{}","response":{{"authenticatorData":"{}","clientDataJSON":"{}","signature":"{}"}},"prf":{{"first":"!!!"}}}}"#,
+            base64_url_encode(&[1u8]),
+            base64_url_encode(&[2u8]),
+            base64_url_encode(&[3u8]),
+            base64_url_encode(&[4u8]),
+        );
+        let v: serde_json::Value = serde_json::from_str(&json).unwrap();
+
+        let err = prf::authentication_output_from_bridge(&v).unwrap_err();
+        assert_eq!(err.kind(), "authenticator");
     }
 }

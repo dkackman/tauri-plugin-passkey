@@ -14,65 +14,6 @@ import org.robolectric.annotation.Config
 @RunWith(RobolectricTestRunner::class)
 @Config(manifest = Config.NONE, sdk = [34])
 class WebauthnPluginTest {
-    // --- translateRegistrationRequest -------------------------------------
-
-    @Test
-    fun registrationRequestWithoutExtensionsIsUnchanged() {
-        val input = """{"challenge":"abc","rp":{"id":"example.com"}}"""
-        assertEquals(input, WebauthnPlugin.translateRegistrationRequest(input))
-    }
-
-    @Test
-    fun registrationRequestAddsPrfWhenHmacCreateSecretTrue() {
-        val input = """{"extensions":{"hmacCreateSecret":true}}"""
-        val ext = JSONObject(WebauthnPlugin.translateRegistrationRequest(input)).getJSONObject("extensions")
-        assertTrue("prf object should be present", ext.has("prf"))
-        assertFalse("legacy hmacCreateSecret should be removed", ext.has("hmacCreateSecret"))
-    }
-
-    @Test
-    fun registrationRequestDropsHmacCreateSecretWhenFalse() {
-        val input = """{"extensions":{"hmacCreateSecret":false}}"""
-        val ext = JSONObject(WebauthnPlugin.translateRegistrationRequest(input)).getJSONObject("extensions")
-        assertFalse("no prf when not requested", ext.has("prf"))
-        assertFalse("legacy hmacCreateSecret should be removed", ext.has("hmacCreateSecret"))
-    }
-
-    // --- translateAuthenticationRequest -----------------------------------
-
-    @Test
-    fun authenticationRequestWithoutExtensionsIsUnchanged() {
-        val input = """{"challenge":"abc","rpId":"example.com"}"""
-        assertEquals(input, WebauthnPlugin.translateAuthenticationRequest(input))
-    }
-
-    @Test
-    fun authenticationRequestMapsBothSaltsIntoPrfEval() {
-        val input = """{"extensions":{"hmacGetSecret":{"output1":"c2FsdDE","output2":"c2FsdDI"}}}"""
-        val ext = JSONObject(WebauthnPlugin.translateAuthenticationRequest(input)).getJSONObject("extensions")
-        assertFalse("legacy hmacGetSecret should be removed", ext.has("hmacGetSecret"))
-        val eval = ext.getJSONObject("prf").getJSONObject("eval")
-        assertEquals("c2FsdDE", eval.getString("first"))
-        assertEquals("c2FsdDI", eval.getString("second"))
-    }
-
-    @Test
-    fun authenticationRequestOmitsSecondSaltWhenAbsent() {
-        val input = """{"extensions":{"hmacGetSecret":{"output1":"c2FsdDE"}}}"""
-        val ext = JSONObject(WebauthnPlugin.translateAuthenticationRequest(input)).getJSONObject("extensions")
-        val eval = ext.getJSONObject("prf").getJSONObject("eval")
-        assertEquals("c2FsdDE", eval.getString("first"))
-        assertFalse("second salt must be omitted when not supplied", eval.has("second"))
-    }
-
-    @Test
-    fun authenticationRequestOmitsSecondSaltWhenEmpty() {
-        val input = """{"extensions":{"hmacGetSecret":{"output1":"c2FsdDE","output2":""}}}"""
-        val ext = JSONObject(WebauthnPlugin.translateAuthenticationRequest(input)).getJSONObject("extensions")
-        val eval = ext.getJSONObject("prf").getJSONObject("eval")
-        assertFalse("empty second salt must be omitted", eval.has("second"))
-    }
-
     // --- flattenPrfOutput -------------------------------------------------
 
     @Test
@@ -104,5 +45,15 @@ class WebauthnPluginTest {
         val prf = WebauthnPlugin.flattenPrfOutput(input).getJSONObject("prf")
         assertEquals("Rmly", prf.getString("first"))
         assertFalse(prf.has("second"))
+    }
+
+    @Test
+    fun `flattenPrfOutput lifts prf results to the top level`() {
+        val response =
+            WebauthnPlugin.flattenPrfOutput(
+                """{"id":"cred","clientExtensionResults":{"prf":{"results":{"first":"c2VjcmV0"}}}}""",
+            )
+        val prf = response.getJSONObject("prf")
+        assertEquals("c2VjcmV0", prf.getString("first"))
     }
 }

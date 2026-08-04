@@ -7,6 +7,8 @@ use tauri::{
 mod authenticators;
 mod commands;
 mod error;
+mod normalize;
+mod prf;
 mod validation;
 #[cfg(test)]
 mod wire_contract;
