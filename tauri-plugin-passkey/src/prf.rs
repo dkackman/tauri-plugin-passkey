@@ -233,6 +233,13 @@ pub fn require_authentication_output(
 /// No `prf` key means the platform didn't attempt PRF (`Ok(None)`); a `prf`
 /// key present but malformed is a bridge bug and must not be mistaken for
 /// "no PRF" — it is reported as an error instead of silently discarded.
+///
+/// Only used by the macOS/iOS/Android bridges, so other targets would
+/// otherwise see it as dead code.
+#[cfg_attr(
+    not(any(target_os = "macos", target_os = "ios", target_os = "android")),
+    allow(dead_code)
+)]
 pub fn registration_output_from_bridge(v: &Value) -> crate::Result<Option<PrfRegistrationOutput>> {
     let Some(prf) = v.get("prf") else {
         return Ok(None);
@@ -246,6 +253,13 @@ pub fn registration_output_from_bridge(v: &Value) -> crate::Result<Option<PrfReg
 /// Parse the flat top-level `prf` object the Swift and Kotlin bridges resolve.
 /// Same "missing key means no PRF, malformed value is an error" rule as
 /// [`registration_output_from_bridge`].
+///
+/// Only used by the macOS/iOS/Android bridges, so other targets would
+/// otherwise see it as dead code.
+#[cfg_attr(
+    not(any(target_os = "macos", target_os = "ios", target_os = "android")),
+    allow(dead_code)
+)]
 pub fn authentication_output_from_bridge(
     v: &Value,
 ) -> crate::Result<Option<PrfAuthenticationOutput>> {
