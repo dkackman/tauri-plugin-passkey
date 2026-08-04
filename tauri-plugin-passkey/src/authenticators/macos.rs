@@ -131,7 +131,7 @@ impl<R: Runtime> Authenticator<R> for Webauthn<R> {
         let v: serde_json::Value = serde_json::from_str(&json)?;
         Ok((
             parse_registration_response(&v)?,
-            prf::registration_output_from_bridge(&v),
+            prf::registration_output_from_bridge(&v)?,
         ))
     }
 
@@ -204,7 +204,7 @@ impl<R: Runtime> Authenticator<R> for Webauthn<R> {
         let v: serde_json::Value = serde_json::from_str(&json)?;
         Ok((
             parse_authentication_response(&v)?,
-            prf::authentication_output_from_bridge(&v),
+            prf::authentication_output_from_bridge(&v)?,
         ))
     }
 
@@ -378,7 +378,7 @@ mod tests {
         assert_eq!(parsed.response.client_data_json.as_slice(), &cdj);
         assert_eq!(parsed.type_, "public-key");
         assert_eq!(
-            prf::registration_output_from_bridge(&v),
+            prf::registration_output_from_bridge(&v).unwrap(),
             Some(PrfRegistrationOutput { enabled: true })
         );
     }
@@ -395,7 +395,7 @@ mod tests {
 
         parse_registration_response(&v).unwrap();
 
-        assert!(prf::registration_output_from_bridge(&v).is_none());
+        assert!(prf::registration_output_from_bridge(&v).unwrap().is_none());
     }
 
     #[test]
@@ -442,7 +442,7 @@ mod tests {
             parsed.response.user_handle.as_ref().unwrap().as_slice(),
             &user_handle
         );
-        let prf_output = prf::authentication_output_from_bridge(&v).unwrap();
+        let prf_output = prf::authentication_output_from_bridge(&v).unwrap().unwrap();
         assert_eq!(prf_output.first, prf_first);
         assert_eq!(prf_output.second.as_deref(), Some(&prf_second[..]));
     }
@@ -464,7 +464,7 @@ mod tests {
 
         // No userHandle in the JSON -> None.
         assert!(parsed.response.user_handle.is_none());
-        let prf_output = prf::authentication_output_from_bridge(&v).unwrap();
+        let prf_output = prf::authentication_output_from_bridge(&v).unwrap().unwrap();
         assert_eq!(prf_output.first, prf_first);
         assert!(prf_output.second.is_none());
     }
@@ -482,6 +482,23 @@ mod tests {
 
         parse_authentication_response(&v).unwrap();
 
-        assert!(prf::authentication_output_from_bridge(&v).is_none());
+        assert!(prf::authentication_output_from_bridge(&v)
+            .unwrap()
+            .is_none());
+    }
+
+    #[test]
+    fn authentication_response_with_malformed_prf_first_errors() {
+        let json = format!(
+            r#"{{"id":"credF","rawId":"{}","response":{{"authenticatorData":"{}","clientDataJSON":"{}","signature":"{}"}},"prf":{{"first":"!!!"}}}}"#,
+            base64_url_encode(&[1u8]),
+            base64_url_encode(&[2u8]),
+            base64_url_encode(&[3u8]),
+            base64_url_encode(&[4u8]),
+        );
+        let v: serde_json::Value = serde_json::from_str(&json).unwrap();
+
+        let err = prf::authentication_output_from_bridge(&v).unwrap_err();
+        assert_eq!(err.kind(), "authenticator");
     }
 }

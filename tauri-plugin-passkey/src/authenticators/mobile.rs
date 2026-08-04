@@ -57,7 +57,7 @@ impl<R: Runtime> Authenticator<R> for Webauthn<R> {
 
         Ok((
             parse_registration_response(&v)?,
-            crate::prf::registration_output_from_bridge(&v),
+            crate::prf::registration_output_from_bridge(&v)?,
         ))
     }
 
@@ -79,7 +79,7 @@ impl<R: Runtime> Authenticator<R> for Webauthn<R> {
 
         Ok((
             parse_authentication_response(&v)?,
-            crate::prf::authentication_output_from_bridge(&v),
+            crate::prf::authentication_output_from_bridge(&v)?,
         ))
     }
 

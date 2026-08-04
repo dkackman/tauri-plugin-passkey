@@ -9,7 +9,7 @@ The plugin talks to each platform's native passkey API (ASAuthorization on Apple
 | Capability                          | Linux | macOS 14+       | iOS 17.4+       | Android 9+      | Windows 10 1903+     |
 | ----------------------------------- | ----- | --------------- | --------------- | --------------- | -------------------- |
 | `register` / `authenticate`         | ✅    | ✅              | ✅              | ✅              | ✅                   |
-| PRF / hmac-secret extension         | ✅    | ✅              | ✅ (iOS 18+)    | ✅              | ❌ (see [PRF](#prf)) |
+| PRF / hmac-secret extension         | ✅    | ✅ (macOS 15+)  | ✅ (iOS 18+)    | ✅              | ❌ (see [PRF](#prf)) |
 | Credential discovery (usernameless) | ✅    | ✅              | ✅              | ✅              | ❌                   |
 | `cancel`                            | ✅    | ✅              | ✅              | ✅              | ❌ (no-op)           |
 | `sendPin` / `selectKey` / events    | ✅    | n/a — native UI | n/a — native UI | n/a — native UI | n/a — native UI      |

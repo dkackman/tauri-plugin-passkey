@@ -291,9 +291,11 @@ struct PrfResults {
 /// commands.
 ///
 /// Note: this field is NOT covered by the authenticator's signature per the
-/// WebAuthn spec. On macOS/iOS the native bridge constructs this from the
-/// platform-verified PRF output, so it is trustworthy in practice. A
-/// tampered Tauri frontend could inject arbitrary values here.
+/// WebAuthn spec. On every backend (macOS/iOS's native bridge, Android's
+/// Credential Manager, and Linux's direct CTAP2 authenticator) the plugin
+/// constructs this from the platform-verified PRF output, so it is
+/// trustworthy in practice. A tampered Tauri frontend could inject arbitrary
+/// values here.
 fn extract_prf_results(response: &serde_json::Value) -> Option<PrfResults> {
     response
         .get("clientExtensionResults")

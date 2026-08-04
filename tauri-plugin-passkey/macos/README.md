@@ -287,6 +287,8 @@ The plugin accepts the browser `prf` extension directly and returns the browser 
 
 The recovered secret is at `assertion.clientExtensionResults.prf.results.first` (base64url). `extensions.prf` is the only accepted spelling — the `webauthn-rs-proto` `hmacCreateSecret` / `hmacGetSecret` shape is not accepted; register with `prf: {}` and evaluate salts during authentication. Salts may be any length; ASAuthorization applies the browser's PRF derivation internally, so the salt you pass here is used exactly as it would be in a browser.
 
+**Requires macOS 15+.** `ASAuthorizationPublicKeyCredentialPRFAssertionInput` is only used when `#available(macOS 15.0, *)`; on macOS 14 registration still succeeds but reports `prf.enabled: false`, and an assertion that requests salts fails with an `"unsupported"` error rather than silently returning no secret.
+
 ## Limitations
 
 - **Credential providers**: Only iCloud Keychain appears in the [ASAuthorization](https://developer.apple.com/documentation/authenticationservices/asauthorizationcontroller) sheet. Third-party providers like 1Password do not yet implement the macOS [Credential Provider API](https://developer.apple.com/documentation/authenticationservices/ascredentialproviderextensioncontext).
