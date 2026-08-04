@@ -35,7 +35,7 @@ class WebauthnPlugin(
 
         val createPublicKeyCredentialRequest =
             CreatePublicKeyCredentialRequest(
-                requestJson = translateRegistrationRequest(args),
+                requestJson = args,
             )
 
         currentJob =
@@ -72,7 +72,7 @@ class WebauthnPlugin(
 
         val getPublicKeyCredentialOption =
             GetPublicKeyCredentialOption(
-                requestJson = translateAuthenticationRequest(args),
+                requestJson = args,
             )
         val getCredRequest =
             GetCredentialRequest(
@@ -116,38 +116,6 @@ class WebauthnPlugin(
     }
 
     internal companion object {
-        // webauthn-rs serializes the PRF extension under its legacy hmac-secret
-        // names (`hmacCreateSecret`/`hmacGetSecret`); Credential Manager only
-        // understands the standard WebAuthn `prf` key. The iOS/macOS bridges do
-        // the equivalent translation into ASAuthorization PRF inputs.
-        @VisibleForTesting
-        fun translateRegistrationRequest(requestJson: String): String {
-            val request = JSONObject(requestJson)
-            val extensions = request.optJSONObject("extensions") ?: return requestJson
-            if (extensions.optBoolean("hmacCreateSecret", false)) {
-                extensions.put("prf", JSONObject())
-            }
-            extensions.remove("hmacCreateSecret")
-            return request.toString()
-        }
-
-        @VisibleForTesting
-        fun translateAuthenticationRequest(requestJson: String): String {
-            val request = JSONObject(requestJson)
-            val extensions = request.optJSONObject("extensions") ?: return requestJson
-            extensions.optJSONObject("hmacGetSecret")?.let { hmacGetSecret ->
-                val eval = JSONObject()
-                eval.put("first", hmacGetSecret.getString("output1"))
-                hmacGetSecret
-                    .optString("output2")
-                    .takeIf { it.isNotEmpty() }
-                    ?.let { eval.put("second", it) }
-                extensions.put("prf", JSONObject().put("eval", eval))
-            }
-            extensions.remove("hmacGetSecret")
-            return request.toString()
-        }
-
         // The shared Rust parser (mobile.rs) expects a flat top-level `prf`
         // object — {"enabled": bool} after registration, {"first"/"second":
         // base64url} after authentication — matching what the Swift bridges
