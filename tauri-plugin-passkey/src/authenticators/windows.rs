@@ -14,6 +14,25 @@ use crate::prf::{
 
 use super::Authenticator;
 
+/// Windows' WebAuthn API exposes no PRF/hmac-secret support. Registration still
+/// succeeds and reports `prf.enabled: false` — the same signal a browser gives for
+/// an authenticator without hmac-secret — so callers learn before they store
+/// anything that they cannot derive a secret here.
+fn registration_prf_output(prf: Option<PrfRegistrationInput>) -> Option<PrfRegistrationOutput> {
+    prf.map(|_| PrfRegistrationOutput { enabled: false })
+}
+
+/// An assertion that actually asks for a secret must fail loudly: silently
+/// returning no secret risks data the caller can never decrypt again.
+fn reject_prf(prf: Option<&PrfAuthenticationInput>) -> crate::Result<()> {
+    if prf.is_some() {
+        return Err(crate::Error::Unsupported(
+            "PRF is not supported by the Windows WebAuthn API".into(),
+        ));
+    }
+    Ok(())
+}
+
 /// Access to the webauthn APIs.
 #[derive(Debug)]
 pub struct Webauthn<R: Runtime> {
@@ -38,7 +57,6 @@ impl<R: Runtime> Authenticator<R> for Webauthn<R> {
         prf: Option<PrfRegistrationInput>,
         timeout: u32,
     ) -> crate::Result<(RegisterPublicKeyCredential, Option<PrfRegistrationOutput>)> {
-        let _ = prf;
         let mut auth = Win10::default();
         let credential = auth
             .perform_register(origin, options, timeout)
@@ -47,7 +65,7 @@ impl<R: Runtime> Authenticator<R> for Webauthn<R> {
                 log::error!("Failed to register: {:?}", e);
                 crate::Error::WebAuthn(e)
             })?;
-        Ok((credential, None))
+        Ok((credential, registration_prf_output(prf)))
     }
 
     /// Authenticate using native Windows API.
@@ -58,7 +76,7 @@ impl<R: Runtime> Authenticator<R> for Webauthn<R> {
         prf: Option<PrfAuthenticationInput>,
         timeout: u32,
     ) -> crate::Result<(PublicKeyCredential, Option<PrfAuthenticationOutput>)> {
-        let _ = prf;
+        reject_prf(prf.as_ref())?;
         let mut auth = Win10::default();
         let credential = auth.perform_auth(origin, options, timeout).map_err(|e| {
             #[cfg(feature = "log")]
@@ -66,5 +84,30 @@ impl<R: Runtime> Authenticator<R> for Webauthn<R> {
             crate::Error::WebAuthn(e)
         })?;
         Ok((credential, None))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn registration_reports_prf_as_unavailable() {
+        assert_eq!(
+            registration_prf_output(Some(PrfRegistrationInput)),
+            Some(PrfRegistrationOutput { enabled: false })
+        );
+        assert_eq!(registration_prf_output(None), None);
+    }
+
+    #[test]
+    fn authentication_with_salts_is_rejected() {
+        let err = reject_prf(Some(&PrfAuthenticationInput {
+            first: b"salt1".to_vec(),
+            second: None,
+        }))
+        .unwrap_err();
+        assert_eq!(err.kind(), "unsupported");
+        assert!(reject_prf(None).is_ok());
     }
 }
