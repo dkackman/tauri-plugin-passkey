@@ -38,6 +38,13 @@ impl<R: Runtime> Authenticator<R> for Webauthn<R> {
         prf: Option<PrfRegistrationInput>,
         _timeout: u32,
     ) -> crate::Result<(RegisterPublicKeyCredential, Option<PrfRegistrationOutput>)> {
+        #[cfg(target_os = "android")]
+        let options = {
+            let mut options = options;
+            crate::normalize::apply_android_resident_key(&mut options)?;
+            options
+        };
+
         let mut options = serde_json::to_value(&options)?;
         if prf.is_some() {
             // Credential Manager and ASAuthorization both want the browser spelling.

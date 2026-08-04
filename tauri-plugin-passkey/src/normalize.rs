@@ -6,6 +6,45 @@
 //! here — see [`crate::prf`].
 
 use serde_json::Value;
+use webauthn_rs_proto::{
+    AuthenticatorSelectionCriteria, PublicKeyCredentialCreationOptions, ResidentKeyRequirement,
+};
+
+/// Android's Credential Manager only creates discoverable credentials, and will
+/// not persist the passkey unless a resident key is requested. Fill in the default
+/// when the caller said nothing, honour an explicit `preferred`/`required`, and
+/// refuse `discouraged` rather than silently doing the opposite.
+///
+/// Only called from `authenticators::mobile` on `target_os = "android"`; the
+/// `mod normalize` in `lib.rs` isn't `pub`, so on other hosts rustc sees this as
+/// unreachable and would flag it dead code.
+#[cfg_attr(not(target_os = "android"), allow(dead_code))]
+pub fn apply_android_resident_key(
+    options: &mut PublicKeyCredentialCreationOptions,
+) -> crate::Result<()> {
+    let selection = options
+        .authenticator_selection
+        .get_or_insert(AuthenticatorSelectionCriteria {
+            authenticator_attachment: None,
+            resident_key: None,
+            require_resident_key: false,
+            user_verification: webauthn_rs_proto::UserVerificationPolicy::Preferred,
+        });
+
+    match selection.resident_key {
+        Some(ResidentKeyRequirement::Discouraged) => Err(crate::Error::Unsupported(
+            "Android Credential Manager only creates discoverable credentials; \
+             residentKey \"discouraged\" is not supported"
+                .into(),
+        )),
+        Some(_) => Ok(()),
+        None => {
+            selection.resident_key = Some(ResidentKeyRequirement::Preferred);
+            selection.require_resident_key = false;
+            Ok(())
+        }
+    }
+}
 
 /// Fill in `requireResidentKey` from `residentKey` when the caller omitted it.
 pub fn default_require_resident_key(options: &mut Value) {
@@ -27,6 +66,59 @@ pub fn default_require_resident_key(options: &mut Value) {
 mod tests {
     use super::*;
     use serde_json::json;
+    use webauthn_rs_proto::{AuthenticatorSelectionCriteria, ResidentKeyRequirement};
+
+    fn selection(resident_key: Option<ResidentKeyRequirement>) -> AuthenticatorSelectionCriteria {
+        AuthenticatorSelectionCriteria {
+            authenticator_attachment: None,
+            resident_key,
+            require_resident_key: false,
+            user_verification: webauthn_rs_proto::UserVerificationPolicy::Preferred,
+        }
+    }
+
+    fn creation_options(
+        selection: Option<AuthenticatorSelectionCriteria>,
+    ) -> webauthn_rs_proto::PublicKeyCredentialCreationOptions {
+        let mut options: webauthn_rs_proto::PublicKeyCredentialCreationOptions =
+            serde_json::from_value(json!({
+                "rp": { "id": "example.com", "name": "Example" },
+                "user": { "id": "dXNlci1pZA", "name": "alice", "displayName": "Alice" },
+                "challenge": "Y2hhbGxlbmdlLWJ5dGVz",
+                "pubKeyCredParams": [{ "type": "public-key", "alg": -7 }]
+            }))
+            .unwrap();
+        options.authenticator_selection = selection;
+        options
+    }
+
+    #[test]
+    fn android_defaults_unset_resident_key_to_preferred() {
+        let mut options = creation_options(None);
+        apply_android_resident_key(&mut options).unwrap();
+        assert!(matches!(
+            options.authenticator_selection.unwrap().resident_key,
+            Some(ResidentKeyRequirement::Preferred)
+        ));
+    }
+
+    #[test]
+    fn android_preserves_required_resident_key() {
+        let mut options = creation_options(Some(selection(Some(ResidentKeyRequirement::Required))));
+        apply_android_resident_key(&mut options).unwrap();
+        assert!(matches!(
+            options.authenticator_selection.unwrap().resident_key,
+            Some(ResidentKeyRequirement::Required)
+        ));
+    }
+
+    #[test]
+    fn android_rejects_discouraged_resident_key() {
+        let mut options =
+            creation_options(Some(selection(Some(ResidentKeyRequirement::Discouraged))));
+        let err = apply_android_resident_key(&mut options).unwrap_err();
+        assert_eq!(err.kind(), "unsupported");
+    }
 
     #[test]
     fn defaults_require_resident_key_when_absent() {
