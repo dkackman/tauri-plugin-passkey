@@ -1,0 +1,46 @@
+{
+  "java.configuration.updateBuildConfiguration": "interactive",
+  "files.insertFinalNewline": true,
+  "[json]": {
+    "editor.defaultFormatter": "esbenp.prettier-vscode"
+  },
+  "[jsonc]": {
+    "editor.defaultFormatter": "esbenp.prettier-vscode"
+  },
+  "cSpell.words": [
+    "androidx",
+    "assetlinks",
+    "ASAuthorization",
+    "authenticator",
+    "base64url",
+    "clippy",
+    "CTAP",
+    "devenv",
+    "FIDO",
+    "Genymotion",
+    "gphone",
+    "gradlew",
+    "hidapi",
+    "kackman",
+    "ktlint",
+    "naturalcycles",
+    "openssl",
+    "passkey",
+    "passkeys",
+    "pcsc",
+    "PRF",
+    "ProfiiDev",
+    "ranchu",
+    "rpId",
+    "rustc",
+    "serde",
+    "swiftc",
+    "swiftformat",
+    "swiftlint",
+    "thiserror",
+    "udev",
+    "webauthn",
+    "xcrun",
+    "xctoolchain"
+  ]
+}

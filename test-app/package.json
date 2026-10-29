@@ -4,7 +4,9 @@
   "description": "",
   "type": "module",
   "scripts": {
+    "predev": "cd ../tauri-plugin-passkey && pnpm build",
     "dev": "vite dev",
+    "prebuild": "cd ../tauri-plugin-passkey && pnpm build",
     "build": "vite build",
     "preview": "vite preview",
     "check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
@@ -13,8 +15,8 @@
     "format:check": "prettier --check . && cargo fmt --manifest-path src-tauri/Cargo.toml --check",
     "format:js": "prettier --write .",
     "format:rust": "cargo fmt --manifest-path src-tauri/Cargo.toml",
-    "lint": "prettier --check . && pnpm lint:rust",
-    "lint:js": "prettier --check .",
+    "lint": "pnpm lint:js && pnpm lint:rust",
+    "lint:js": "prettier --check . && pnpm check",
     "lint:rust": "cargo clippy --manifest-path src-tauri/Cargo.toml --all-targets -- -D warnings",
     "tauri": "tauri"
   },
