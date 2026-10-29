@@ -159,6 +159,12 @@ pnpm build    # Everything builds
 3. `./tag-release.sh vX.Y.Z[-suffix]` — validates the tag matches the bumped versions,
    tags, and pushes, which triggers `.github/workflows/publish.yml` (crates.io + npm)
 
+Neither package has been published yet. Trusted publishing (OIDC) only works for a
+crate/package that already exists, so the first release is manual: `cargo publish`
+from `tauri-plugin-passkey/` and `pnpm build && npm publish --access public` there,
+then register this repo as the trusted publisher on crates.io and npmjs.com. After
+that, step 3 publishes on its own.
+
 ## Debugging
 
 Android logs: `./adb-logs.sh`.

@@ -31,13 +31,13 @@ targets = [
 all-features = true
 
 [dependencies]
-tauri = { version = "2.5.0" }
+tauri = { version = "2.11.1" }
 serde = "1.0"
 thiserror = "2"
 webauthn-rs-proto = "~0.5"
 log = { version = "0.4.27", optional = true }
 serde_json = "1.0.140"
-tokio = { version = "1.45.0", features = ["sync", "rt", "rt-multi-thread"] }
+tokio = { version = "1.54.1", features = ["sync", "rt", "rt-multi-thread"] }
 base64urlsafedata = "0.5.1"
 base64 = "0.23.0"
 sha2 = "0.10"
@@ -57,10 +57,10 @@ authenticator = { version = "0.5.0", default-features = false, features = [
   "crypto_openssl",
 ] }
 serde_cbor_2 = "0.13.0"
-openssl = "0.10.72"
+openssl = "0.10.80"
 
 [target.'cfg(windows)'.dependencies]
-webauthn-authenticator-rs = { version = "0.5.0", features = [
+webauthn-authenticator-rs = { version = "0.5.5", features = [
   "nfc",
   "usb",
   "win10",
@@ -68,4 +68,4 @@ webauthn-authenticator-rs = { version = "0.5.0", features = [
 # webauthn-authenticator-rs pulls openssl-sys transitively (via webauthn-rs-core).
 # Windows runners/toolchains have no discoverable system OpenSSL, so build it from
 # source. Feature unification makes the transitive openssl-sys build vendored too.
-openssl = { version = "0.10", features = ["vendored"] }
+openssl = { version = "0.10.80", features = ["vendored"] }

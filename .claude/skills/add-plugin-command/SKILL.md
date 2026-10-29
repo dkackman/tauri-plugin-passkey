@@ -58,5 +58,5 @@ cd test-app && pnpm tauri [ios|android] dev
 ```
 
 For desktop, `pnpm tauri dev` (Windows/Linux) or, on macOS,
-`./build-macos-dev.sh && open src-tauri/target/debug/bundle/macos/test-app.app` (a
+`./build-macos-dev.sh && open src-tauri/target/debug/bundle/macos/webauthn.app` (a
 signed `.app` bundle is required — the raw binary won't pass ASAuthorization checks).
