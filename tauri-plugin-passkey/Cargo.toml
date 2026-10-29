@@ -1,9 +1,9 @@
 [package]
 name = "tauri-plugin-passkey"
-version = "0.2.0"
+version = "0.1.0-alpha.1"
 authors = ["Don Kackman"]
 description = "Tauri plugin for WebAuthn / passkey (FIDO2) authentication on macOS, iOS, Windows, Android, and Linux."
-license = "MIT OR Apache-2.0"
+license = "Apache-2.0"
 repository = "https://github.com/dkackman/tauri-plugin-passkey"
 homepage = "https://github.com/dkackman/tauri-plugin-passkey"
 documentation = "https://docs.rs/tauri-plugin-passkey"
@@ -11,13 +11,43 @@ categories = ["api-bindings", "authentication", "cryptography"]
 keywords = ["tauri", "plugin", "webauthn", "passkey", "fido2"]
 edition = "2021"
 rust-version = "1.81"
+readme = "README.md"
+# Keep in step with the files Tauri and SwiftPM/Gradle actually need at build time.
+# ios/Tests and macos/Tests stay in: both Package.swift files declare a testTarget,
+# and SwiftPM refuses to load a package whose target directory is missing.
 exclude = [
   "/examples",
-  "/dist-js",
-  "/guest-js",
-  "/node_modules",
-  "/.github",
-  "/.vscode",
+  "/scripts",
+  "**/.tauri",
+  "**/target",
+  "**/node_modules",
+  "**/build",
+  "**/.gradle",
+  "**/.build",
+  "**/.swiftpm",
+  "**/Package.resolved",
+  "**/.git",
+  "**/.github",
+  "**/.vscode",
+  "**/.gitignore",
+  "**/.DS_Store",
+  "**/dist",
+  "**/dist-js",
+  "**/guest-js",
+  "**/.idea",
+  "**/package-lock.json",
+  "**/pnpm-lock.yaml",
+  "**/.npmrc",
+  "**/.prettierignore",
+  "**/.prettierrc.json",
+  "**/.swiftlint.yml",
+  "**/.swiftformat",
+  "**/rollup.config.js",
+  "**/tsconfig.json",
+  "**/tsconfig.tsbuildinfo",
+  "**/vitest.config.ts",
+  "**/package.json",
+  "**/android/local.properties",
 ]
 links = "tauri-plugin-passkey"
 

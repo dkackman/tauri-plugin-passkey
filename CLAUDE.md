@@ -152,18 +152,34 @@ pnpm build    # Everything builds
 
 ## Release flow
 
-1. `./bump-version.sh X.Y.Z[-suffix]` — bumps `Cargo.toml` + `package.json` in lockstep
-   and regenerates `CHANGELOG.md` from conventional commits (requires `git-cliff` for
-   the changelog step)
+1. `./bump-version.sh X.Y.Z[-suffix]` — bumps `Cargo.toml` + `package.json` in lockstep,
+   updates the pinned version in the README install snippets, and prepends the new
+   release's section to `CHANGELOG.md` from conventional commits (requires `git-cliff`
+   for the changelog step). The changelog is hand-curated: edit the prepended section
+   down to user-facing changes, and never regenerate the whole file.
 2. Review the diff, commit
-3. `./tag-release.sh vX.Y.Z[-suffix]` — validates the tag matches the bumped versions,
-   tags, and pushes, which triggers `.github/workflows/publish.yml` (crates.io + npm)
+3. `./tag-release.sh vX.Y.Z[-suffix]` — validates the tag matches the bumped versions
+   and that the license files are in sync, tags, and pushes, which triggers
+   `.github/workflows/publish.yml` (crates.io + npm)
 
-Neither package has been published yet. Trusted publishing (OIDC) only works for a
-crate/package that already exists, so the first release is manual: `cargo publish`
-from `tauri-plugin-passkey/` and `pnpm build && npm publish --access public` there,
-then register this repo as the trusted publisher on crates.io and npmjs.com. After
-that, step 3 publishes on its own.
+Versions are prereleases (`-alpha.N`, then `-beta.N` / `-rc.N`) until 1.0. Only
+`-alpha`, `-beta` and `-rc` suffixes are understood by `publish.yml`.
+
+The first release (`0.1.0-alpha.1`) is manual. Trusted publishing (OIDC) only works for a
+crate/package that already exists, so run `cargo publish` from `tauri-plugin-passkey/`
+and `pnpm build && npm publish --access public --tag alpha` there, then register this
+repo as the trusted publisher on crates.io and npmjs.com. After that, step 3 publishes
+on its own.
+
+### Licensing and attribution
+
+The project is Apache-2.0 (`LICENSE`). It is a fork of ProfiiDev's MIT-licensed
+`tauri-plugin-webauthn` (itself forked from fendent's), and that MIT copyright and
+permission notice must ship with every copy — it lives in `NOTICE`. Both registries
+package only `tauri-plugin-passkey/`, so that directory holds copies of the root
+`LICENSE` and `NOTICE`; edit the root files and copy them over (`tag-release.sh`
+refuses to tag if they differ). Keep the upstream credit in both READMEs'
+Acknowledgments sections.
 
 ## Debugging
 

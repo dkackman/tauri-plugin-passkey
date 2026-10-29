@@ -117,15 +117,18 @@ To report a vulnerability, see [SECURITY.md](SECURITY.md).
 
 ## License
 
-MIT OR Apache-2.0
+Apache-2.0. See [LICENSE](LICENSE). Portions under the upstream MIT License keep their
+notice in [NOTICE](NOTICE).
 
 ## Acknowledgments
 
-This project is a derivative of [`tauri-plugin-webauthn`](https://github.com/Profiidev/tauri-plugin-webauthn)
+This project began as a fork of [`tauri-plugin-webauthn`](https://github.com/Profiidev/tauri-plugin-webauthn)
 by [ProfiiDev](https://github.com/Profiidev), itself originally forked from
-[fendent/tauri-plugin-webauthn](https://github.com/fendent/tauri-plugin-webauthn). See
-[NOTICE](NOTICE) for full attribution and [LICENSE-MIT](LICENSE-MIT) for the retained
-original copyright notices.
+[fendent/tauri-plugin-webauthn](https://github.com/fendent/tauri-plugin-webauthn). The
+desktop CTAP2 client, the Windows and Android backends, and the shape of the JS API all
+come from that work, and the git history before the fork is preserved in this
+repository. The fork is maintained independently and is not expected to merge back
+upstream. See [NOTICE](NOTICE) for the retained MIT copyright notices.
 
 ## Contributing
 

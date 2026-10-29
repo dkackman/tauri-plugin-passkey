@@ -26,7 +26,7 @@ In your app's `src-tauri/Cargo.toml`:
 
 ```toml
 [dependencies]
-tauri-plugin-passkey = "0.3"
+tauri-plugin-passkey = "0.1.0-alpha.1"
 ```
 
 ### 2. Add Swift runtime rpath to build.rs

@@ -1,11 +1,12 @@
 {
   "name": "tauri-plugin-passkey-api",
-  "version": "0.2.0",
+  "version": "0.1.0-alpha.1",
   "author": "Don Kackman",
   "description": "Tauri plugin for WebAuthn / passkey (FIDO2) authentication on macOS/iOS, Windows, Android, and Linux.",
   "repository": {
     "type": "git",
-    "url": "https://github.com/dkackman/tauri-plugin-passkey"
+    "url": "https://github.com/dkackman/tauri-plugin-passkey",
+    "directory": "tauri-plugin-passkey"
   },
   "homepage": "https://github.com/dkackman/tauri-plugin-passkey",
   "bugs": "https://github.com/dkackman/tauri-plugin-passkey/issues",
@@ -20,7 +21,7 @@
     "ios",
     "android"
   ],
-  "license": "MIT OR Apache-2.0",
+  "license": "Apache-2.0",
   "type": "module",
   "types": "./dist-js/index.d.ts",
   "main": "./dist-js/index.cjs",
@@ -32,10 +33,12 @@
   },
   "files": [
     "dist-js",
-    "README.md"
+    "README.md",
+    "LICENSE",
+    "NOTICE"
   ],
   "scripts": {
-    "build": "rollup -c",
+    "build": "node -e \"require('fs').rmSync('dist-js',{recursive:true,force:true})\" && rollup -c",
     "verify:package": "node scripts/verify-package.mjs",
     "prepublishOnly": "pnpm build && pnpm verify:package",
     "pretest": "pnpm build",

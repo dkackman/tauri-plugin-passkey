@@ -141,7 +141,7 @@ jobs:
 
       # The package has never been published. npm OIDC trusted publishing cannot
       # create a brand-new package, so the first release must be published manually
-      # once (`pnpm build`, then `npm publish --access public` from
+      # once (`pnpm build`, then `npm publish --access public --tag alpha` from
       # tauri-plugin-passkey/), then this workflow is configured as the package's
       # trusted publisher on npmjs.com. Later releases publish from here.
       - name: Publish to npm

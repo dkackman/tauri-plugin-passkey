@@ -51,6 +51,17 @@ if [ "$NPM_VERSION" != "$VERSION" ]; then
     exit 1
 fi
 
+# The crate and npm package each ship their own copy of LICENSE and NOTICE (both
+# registries package only the plugin directory). NOTICE carries the upstream MIT
+# notice we are obliged to distribute, so a stale copy is a licensing problem.
+for f in LICENSE NOTICE; do
+    if ! cmp -s "$f" "$PKG_DIR/$f"; then
+        echo "Error: $PKG_DIR/$f differs from the repository-root $f."
+        echo "Copy the root file over (cp $f $PKG_DIR/$f) and commit before tagging."
+        exit 1
+    fi
+done
+
 # Ensure working tree is clean
 if ! git diff --quiet || ! git diff --cached --quiet; then
     echo "Error: working tree has uncommitted changes. Commit or stash them first."

@@ -1,6 +1,24 @@
+tauri-plugin-passkey
+Copyright 2026 Don Kackman
+
+Licensed under the Apache License, Version 2.0 (see LICENSE).
+
+This product is a derivative of tauri-plugin-webauthn by ProfiiDev
+(https://github.com/Profiidev/tauri-plugin-webauthn), which was itself
+originally forked from fendent/tauri-plugin-webauthn
+(https://github.com/fendent/tauri-plugin-webauthn). It is an independent fork:
+its changes are not expected to be merged back upstream.
+
+Portions of this product originate in those projects and were received under
+the MIT License. As that license requires, their copyright and permission
+notice is reproduced in full below and applies to those portions.
+
+--------------------------------------------------------------------------------
+
 MIT License
 
-Copyright (c) 2025 ProfiiDev; Copyright (c) 2025 fendent; Copyright (c) 2026 Don Kackman
+Copyright (c) 2025 - ProfiiDev
+Copyright (c) 2025 fendent
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal

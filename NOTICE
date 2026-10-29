@@ -1,10 +1,39 @@
 tauri-plugin-passkey
 Copyright 2026 Don Kackman
 
-This product is a derivative of tauri-plugin-webauthn by ProfiiDev
-(https://github.com/Profiidev/tauri-plugin-webauthn), originally forked from
-fendent (https://github.com/fendent/tauri-plugin-webauthn), used under the MIT
-License. Original MIT copyright notices are retained in LICENSE-MIT.
+Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-Licensed under either of Apache License, Version 2.0 (LICENSE-APACHE) or
-MIT License (LICENSE-MIT) at your option.
+This product is a derivative of tauri-plugin-webauthn by ProfiiDev
+(https://github.com/Profiidev/tauri-plugin-webauthn), which was itself
+originally forked from fendent/tauri-plugin-webauthn
+(https://github.com/fendent/tauri-plugin-webauthn). It is an independent fork:
+its changes are not expected to be merged back upstream.
+
+Portions of this product originate in those projects and were received under
+the MIT License. As that license requires, their copyright and permission
+notice is reproduced in full below and applies to those portions.
+
+--------------------------------------------------------------------------------
+
+MIT License
+
+Copyright (c) 2025 - ProfiiDev
+Copyright (c) 2025 fendent
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.

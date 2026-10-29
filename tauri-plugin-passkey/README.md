@@ -24,10 +24,28 @@ On everything except Linux, the operating system shows its own passkey UI (Touch
 
 ## Install
 
-```bash
-cargo add tauri-plugin-passkey       # in src-tauri/
-pnpm add tauri-plugin-passkey-api    # in your frontend
+> **Alpha.** Every release so far is a prerelease, and the API may still change between
+> alphas. Pin an exact version and read the [changelog](CHANGELOG.md) before upgrading.
+
+In `src-tauri/Cargo.toml`:
+
+```toml
+[dependencies]
+tauri-plugin-passkey = "0.1.0-alpha.1"
 ```
+
+Cargo does not treat prereleases as compatible with one another, so bump this line by
+hand for each alpha.
+
+In your frontend:
+
+```bash
+pnpm add tauri-plugin-passkey-api@alpha
+```
+
+The `alpha` tag always points at the newest prerelease. While there is no stable release
+yet, `latest` is kept in sync with it, but prefer `@alpha` so your intent survives the
+1.0 release.
 
 `@tauri-apps/api` (>= 2.0.0) is a peer dependency of the npm package.
 
@@ -214,13 +232,18 @@ A complete relying-party + frontend example (including PRF, discoverable and non
 
 ## Acknowledgments
 
-This project is a derivative of
-[`tauri-plugin-webauthn`](https://github.com/Profiidev/tauri-plugin-webauthn)
-by [ProfiiDev](https://github.com/Profiidev), itself originally forked from
-[fendent/tauri-plugin-webauthn](https://github.com/fendent/tauri-plugin-webauthn). See the
-[repository's NOTICE file](https://github.com/dkackman/tauri-plugin-passkey/blob/main/NOTICE)
-for full attribution.
+This project began as a fork of
+[`tauri-plugin-webauthn`](https://github.com/Profiidev/tauri-plugin-webauthn) by
+[ProfiiDev](https://github.com/Profiidev), itself originally forked from
+[fendent/tauri-plugin-webauthn](https://github.com/fendent/tauri-plugin-webauthn). The
+desktop CTAP2 client, the Windows and Android backends, and the shape of the JS API all
+come from that work. Thank you to both authors. This fork has diverged substantially and
+is maintained independently; its changes are not expected to go back upstream.
 
 ## License
 
-MIT OR Apache-2.0
+Apache-2.0. See [LICENSE](LICENSE).
+
+Portions of the code come from the projects above under the MIT License; their copyright
+and permission notice is reproduced in [NOTICE](NOTICE), which ships with both the crate
+and the npm package.
