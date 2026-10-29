@@ -34,7 +34,5 @@ Cargo.lock
 
 # Session notes and historical plan/spec docs — prose kept as written, not reflowed
 .remember/
+.superpowers/
 docs/superpowers/
-
-# Upstream-generated, kept in its own formatting
-.github/dependabot.yml

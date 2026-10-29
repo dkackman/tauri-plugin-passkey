@@ -10,6 +10,11 @@ updates:
       all-dependencies:
         patterns:
           - "*"
+    ignore:
+      # Bundles the ktlint the `pnpm lint:kotlin` CLI runs, which must match the
+      # ktlint version android/build.gradle.kts gives the Gradle plugin. Bump both
+      # together by hand.
+      - dependency-name: "@naturalcycles/ktlint"
 
   # Maintain dependencies for Cargo
   - package-ecosystem: cargo
@@ -21,8 +26,17 @@ updates:
       all-dependencies:
         patterns:
           - "*"
+    ignore:
+      # Deliberately held at ~0.5: its JSON types are the plugin's wire format, covered
+      # by contract tests. Move to a new minor by hand, alongside those tests.
+      - dependency-name: "webauthn-rs-proto"
+        update-types:
+          ["version-update:semver-minor", "version-update:semver-major"]
 
-  # Maintain dependencies for GitHub Actions
+  # Maintain dependencies for GitHub Actions. Actions are pinned to commit SHAs with
+  # the version in a trailing comment; Dependabot updates both. The one exception is
+  # dtolnay/rust-toolchain, pinned to its `stable` branch, which Dependabot cannot
+  # track — re-pin it by hand occasionally.
   - package-ecosystem: github-actions
     directory: "/"
     schedule:
