@@ -3,6 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "description": "Tauri Plugin Passkey - Monorepo",
+  "license": "Apache-2.0",
   "scripts": {
     "build": "pnpm -r build",
     "install:all": "pnpm install",
@@ -25,7 +26,7 @@
     "lint:kotlin": "pnpm -r lint:kotlin"
   },
   "devDependencies": {
-    "prettier": "^3.9.6",
+    "prettier": "^3.9.10",
     "prettier-plugin-svelte": "^4.1.1"
   }
 }

@@ -68,12 +68,12 @@
     "@tauri-apps/api": ">=2.0.0"
   },
   "devDependencies": {
-    "@tauri-apps/api": "^2.11.1",
     "@naturalcycles/ktlint": "1.16.1",
-    "@rollup/plugin-typescript": "^12.3.0",
-    "rollup": "^4.62.4",
+    "@rollup/plugin-typescript": "^12.3.1",
+    "@tauri-apps/api": "^2.12.4",
+    "rollup": "^4.66.0",
     "tslib": "^2.8.1",
     "typescript": "^6.0.3",
-    "vitest": "^4.1.10"
+    "vitest": "^5.0.5"
   }
 }

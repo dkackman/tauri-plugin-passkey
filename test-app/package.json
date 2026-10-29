@@ -1,7 +1,8 @@
 {
   "name": "webauthn",
   "version": "0.1.0",
-  "description": "",
+  "private": true,
+  "description": "Example app for tauri-plugin-passkey",
   "type": "module",
   "scripts": {
     "predev": "cd ../tauri-plugin-passkey && pnpm build",
@@ -20,22 +21,22 @@
     "lint:rust": "cargo clippy --manifest-path src-tauri/Cargo.toml --all-targets -- -D warnings",
     "tauri": "tauri"
   },
-  "license": "MIT",
+  "license": "Apache-2.0",
   "dependencies": {
-    "@tauri-apps/api": "^2.11.1",
-    "@tauri-apps/plugin-log": "^2.9.0",
-    "@tauri-apps/plugin-opener": "^2.5.4",
+    "@tauri-apps/api": "^2.12.4",
+    "@tauri-apps/plugin-log": "^2.10.1",
+    "@tauri-apps/plugin-opener": "^2.7.2",
     "tauri-plugin-passkey-api": "file:../tauri-plugin-passkey"
   },
   "devDependencies": {
-    "@sveltejs/adapter-static": "^3.0.10",
-    "@sveltejs/kit": "^2.70.2",
-    "@sveltejs/vite-plugin-svelte": "^7.2.0",
-    "@tauri-apps/cli": "^2.11.4",
-    "prettier": "^3.9.6",
+    "@sveltejs/adapter-static": "^4.0.0",
+    "@sveltejs/kit": "^3.1.0",
+    "@sveltejs/vite-plugin-svelte": "^7.3.1",
+    "@tauri-apps/cli": "^2.12.4",
+    "prettier": "^3.9.10",
     "prettier-plugin-svelte": "^4.1.1",
-    "svelte": "^5.56.8",
-    "svelte-check": "^4.7.3",
+    "svelte": "^5.57.3",
+    "svelte-check": "^4.7.7",
     "typescript": "^6.0.3",
     "vite": "^8.3.5"
   }

@@ -10,7 +10,7 @@ documentation = "https://docs.rs/tauri-plugin-passkey"
 categories = ["api-bindings", "authentication", "cryptography"]
 keywords = ["tauri", "plugin", "webauthn", "passkey", "fido2"]
 edition = "2021"
-rust-version = "1.81"
+rust-version = "1.88"
 readme = "README.md"
 # Keep in step with the files Tauri and SwiftPM/Gradle actually need at build time.
 # ios/Tests and macos/Tests stay in: both Package.swift files declare a testTarget,
@@ -70,7 +70,7 @@ serde_json = "1.0.140"
 tokio = { version = "1.54.1", features = ["sync", "rt", "rt-multi-thread"] }
 base64urlsafedata = "0.5.1"
 base64 = "0.23.0"
-sha2 = "0.10"
+sha2 = "0.11"
 
 [build-dependencies]
 tauri-plugin = { version = "2.2.0", features = ["build"] }
