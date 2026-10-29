@@ -28,7 +28,7 @@ In your app's `src-tauri/Cargo.toml`:
 
 ```toml
 [dependencies]
-tauri-plugin-passkey = "0.1.0-alpha.1"
+tauri-plugin-passkey = "0.1.0-alpha.2"
 ```
 
 ### 2. Register the plugin

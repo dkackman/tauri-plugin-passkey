@@ -31,7 +31,7 @@ In `src-tauri/Cargo.toml`:
 
 ```toml
 [dependencies]
-tauri-plugin-passkey = "0.1.0-alpha.1"
+tauri-plugin-passkey = "0.1.0-alpha.2"
 ```
 
 Cargo does not treat prereleases as compatible with one another, so bump this line by
