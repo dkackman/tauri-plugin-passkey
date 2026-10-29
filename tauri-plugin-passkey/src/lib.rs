@@ -5,14 +5,18 @@ use tauri::{
 };
 
 mod authenticators;
+mod base64url;
 mod commands;
+mod config;
 mod error;
+mod inflight;
 mod normalize;
 mod prf;
 mod validation;
 #[cfg(test)]
 mod wire_contract;
 
+pub use config::Config;
 pub use error::{Error, Result};
 
 #[cfg(not(any(
@@ -43,8 +47,8 @@ impl<R: Runtime, T: Manager<R>> crate::WebauthnExt<R> for T {
 }
 
 /// Initializes the plugin.
-pub fn init<R: Runtime>() -> TauriPlugin<R> {
-    Builder::new("passkey")
+pub fn init<R: Runtime>() -> TauriPlugin<R, Option<Config>> {
+    Builder::<R, Option<Config>>::new("passkey")
         .invoke_handler(tauri::generate_handler![
             commands::register,
             commands::authenticate,
@@ -53,8 +57,20 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
             commands::cancel,
         ])
         .setup(|app, api| {
+            // An absent `plugins.passkey` entry arrives as `null` (None).
+            let config = api.config().clone().unwrap_or_default();
+            #[cfg(feature = "log")]
+            if config.rejects_every_origin() {
+                log::warn!(
+                    "plugins.passkey.allowedOrigins is set but contains no usable \
+                     http(s) origin {:?}; every register/authenticate call will be rejected",
+                    config.allowed_origins
+                );
+            }
+            app.manage(config);
             let webauthn = Webauthn::init(app, api)?;
             app.manage(webauthn);
+            app.manage(inflight::InFlight::default());
             Ok(())
         })
         .build()

@@ -10,7 +10,6 @@
 //! apply the spec's derivation themselves. A backend speaking raw CTAP2 must call
 //! [`ctap_salt`] first.
 
-use base64::{engine::general_purpose::URL_SAFE_NO_PAD, Engine};
 use serde_json::{json, Map, Value};
 use sha2::{Digest, Sha256};
 
@@ -71,15 +70,29 @@ fn decode_salt(value: &Value, field: &str) -> crate::Result<Vec<u8>> {
     let encoded = value.as_str().ok_or_else(|| {
         crate::Error::Validation(format!("prf.eval.{field} must be a base64url string"))
     })?;
-    URL_SAFE_NO_PAD.decode(encoded).map_err(|e| {
+    crate::base64url::decode(encoded).map_err(|e| {
         crate::Error::Validation(format!("prf.eval.{field} is not valid base64url: {e}"))
     })
+}
+
+/// The CTAP2-level `hmacCreateSecret`/`hmacGetSecret` extensions are not a
+/// browser spelling and no backend honours them; silently ignoring them would
+/// let a caller believe it got key-derivation output it never will. Reject
+/// them whether or not `prf` is also present.
+fn reject_legacy_spelling(options: &Value, key: &str) -> crate::Result<()> {
+    if extensions(options).is_some_and(|e| e.contains_key(key)) {
+        return Err(crate::Error::Unsupported(format!(
+            "extensions.{key} is not supported; use the browser `prf` extension instead"
+        )));
+    }
+    Ok(())
 }
 
 /// Read the `prf` extension from browser creation options.
 pub fn registration_input_from_options(
     options: &Value,
 ) -> crate::Result<Option<PrfRegistrationInput>> {
+    reject_legacy_spelling(options, "hmacCreateSecret")?;
     let Some(prf) = extensions(options).and_then(|e| e.get("prf")) else {
         return Ok(None);
     };
@@ -97,9 +110,15 @@ pub fn registration_input_from_options(
 pub fn authentication_input_from_options(
     options: &Value,
 ) -> crate::Result<Option<PrfAuthenticationInput>> {
+    reject_legacy_spelling(options, "hmacGetSecret")?;
     let Some(prf) = extensions(options).and_then(|e| e.get("prf")) else {
         return Ok(None);
     };
+    if prf.get("evalByCredential").is_some() {
+        return Err(crate::Error::Unsupported(
+            "prf.evalByCredential is not supported; pass the salts in prf.eval instead".into(),
+        ));
+    }
     let first = prf
         .get("eval")
         .and_then(|e| e.get("first"))
@@ -123,9 +142,15 @@ pub fn authentication_input_from_options(
 #[cfg_attr(not(mobile), allow(dead_code))]
 fn extensions_mut(options: &mut Value) -> Option<&mut Map<String, Value>> {
     let obj = options.as_object_mut()?;
-    obj.entry("extensions")
+    let extensions = obj
+        .entry("extensions")
         .or_insert_with(|| Value::Object(Map::new()));
-    obj.get_mut("extensions").and_then(Value::as_object_mut)
+    // `extensions: null` (or any other non-object) would otherwise make the
+    // PRF input silently vanish; replace it with an empty object.
+    if !extensions.is_object() {
+        *extensions = Value::Object(Map::new());
+    }
+    extensions.as_object_mut()
 }
 
 /// Write `extensions.prf = {}` into options bound for a native WebAuthn layer.
@@ -140,9 +165,9 @@ pub fn set_registration_prf_input(options: &mut Value) {
 #[cfg_attr(not(mobile), allow(dead_code))]
 pub fn set_authentication_prf_input(options: &mut Value, prf: &PrfAuthenticationInput) {
     let mut eval = Map::new();
-    eval.insert("first".into(), json!(URL_SAFE_NO_PAD.encode(&prf.first)));
+    eval.insert("first".into(), json!(crate::base64url::encode(&prf.first)));
     if let Some(second) = &prf.second {
-        eval.insert("second".into(), json!(URL_SAFE_NO_PAD.encode(second)));
+        eval.insert("second".into(), json!(crate::base64url::encode(second)));
     }
     if let Some(extensions) = extensions_mut(options) {
         extensions.insert("prf".into(), json!({ "eval": Value::Object(eval) }));
@@ -188,9 +213,9 @@ pub fn set_registration_prf(response: &mut Value, prf: Option<PrfRegistrationOut
 pub fn set_authentication_prf(response: &mut Value, prf: Option<PrfAuthenticationOutput>) {
     let prf = prf.map(|p| {
         let mut results = Map::new();
-        results.insert("first".into(), json!(URL_SAFE_NO_PAD.encode(&p.first)));
+        results.insert("first".into(), json!(crate::base64url::encode(&p.first)));
         if let Some(second) = &p.second {
-            results.insert("second".into(), json!(URL_SAFE_NO_PAD.encode(second)));
+            results.insert("second".into(), json!(crate::base64url::encode(second)));
         }
         json!({ "results": Value::Object(results) })
     });
@@ -270,7 +295,7 @@ pub fn authentication_output_from_bridge(
         let Some(s) = prf.get(key).and_then(Value::as_str) else {
             return Ok(None);
         };
-        URL_SAFE_NO_PAD.decode(s).map(Some).map_err(|e| {
+        crate::base64url::decode(s).map(Some).map_err(|e| {
             crate::Error::Authenticator(format!("bridge prf.{key} is not valid base64url: {e}"))
         })
     };
@@ -334,6 +359,45 @@ mod tests {
     }
 
     #[test]
+    fn registration_input_rejects_legacy_hmac_create_secret() {
+        let options = json!({ "extensions": { "hmacCreateSecret": true } });
+        let err = registration_input_from_options(&options).unwrap_err();
+        assert_eq!(err.kind(), "unsupported");
+        assert!(err.to_string().contains("hmacCreateSecret"), "{err}");
+    }
+
+    #[test]
+    fn authentication_input_rejects_legacy_hmac_get_secret() {
+        let options = json!({
+            "extensions": { "hmacGetSecret": { "output1": "c2FsdDE" } }
+        });
+        let err = authentication_input_from_options(&options).unwrap_err();
+        assert_eq!(err.kind(), "unsupported");
+        assert!(err.to_string().contains("hmacGetSecret"), "{err}");
+    }
+
+    #[test]
+    fn authentication_input_rejects_eval_by_credential() {
+        let options = json!({
+            "extensions": { "prf": {
+                "eval": { "first": "c2FsdDE" },
+                "evalByCredential": { "Y3JlZC1pZA": { "first": "c2FsdDI" } }
+            } }
+        });
+        let err = authentication_input_from_options(&options).unwrap_err();
+        assert_eq!(err.kind(), "unsupported");
+        assert!(err.to_string().contains("eval"), "{err}");
+        assert!(err.to_string().contains("evalByCredential"), "{err}");
+    }
+
+    #[test]
+    fn extensions_null_is_replaced_by_object() {
+        let mut options = json!({ "extensions": null });
+        set_registration_prf_input(&mut options);
+        assert_eq!(options["extensions"]["prf"], json!({}));
+    }
+
+    #[test]
     fn authentication_input_decodes_both_salts() {
         let options = json!({
             "extensions": { "prf": { "eval": { "first": "c2FsdDE", "second": "c2FsdDI" } } }
@@ -354,6 +418,15 @@ mod tests {
             .unwrap();
         assert_eq!(input.first, b"x");
         assert!(input.second.is_none());
+    }
+
+    #[test]
+    fn authentication_input_accepts_padded_salts() {
+        let options = json!({ "extensions": { "prf": { "eval": { "first": "c2FsdDE=" } } } });
+        let input = authentication_input_from_options(&options)
+            .unwrap()
+            .unwrap();
+        assert_eq!(input.first, b"salt1");
     }
 
     #[test]

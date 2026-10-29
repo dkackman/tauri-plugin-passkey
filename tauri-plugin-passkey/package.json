@@ -39,7 +39,7 @@
     "verify:package": "node scripts/verify-package.mjs",
     "prepublishOnly": "pnpm build && pnpm verify:package",
     "pretest": "pnpm build",
-    "test": "pnpm test:js && pnpm test:rust && (pnpm test:swift || echo '⚠️  Swift tests skipped (require iOS simulator)') && pnpm test:android",
+    "test": "pnpm test:js && pnpm test:rust && pnpm test:swift:macos && pnpm test:android",
     "test:js": "vitest run",
     "test:js:watch": "vitest",
     "test:rust": "cargo test",
@@ -61,10 +61,11 @@
     "lint:swift": "swiftlint lint --no-cache || { command -v swiftlint >/dev/null 2>&1 && exit 1; echo 'Note: swiftlint not installed. Install with: brew install swiftlint'; }",
     "lint:kotlin": "pnpm exec ktlint 'android/src/**/*.kt'"
   },
-  "dependencies": {
-    "@tauri-apps/api": ">=2.0.0-beta.6"
+  "peerDependencies": {
+    "@tauri-apps/api": ">=2.0.0"
   },
   "devDependencies": {
+    "@tauri-apps/api": "^2.11.1",
     "@naturalcycles/ktlint": "1.16.1",
     "@rollup/plugin-typescript": "^12.3.0",
     "rollup": "^4.62.4",

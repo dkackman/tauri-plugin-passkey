@@ -32,7 +32,7 @@ This updates `src-tauri/tauri.conf.json` and generates `src-tauri/Entitlements.p
 
 To edit values manually instead, see `src-tauri/Entitlements.plist.example` for the template.
 
-For more detail on platform-specific signing requirements, see the [macOS](../../macos/README.md) and [iOS](../../ios/README.md) READMEs.
+For more detail on platform-specific signing requirements, see the [macOS](../tauri-plugin-passkey/macos/README.md) and [iOS](../tauri-plugin-passkey/ios/README.md) READMEs.
 
 ## Relying Party Domain
 
@@ -175,7 +175,7 @@ cd test-app
 Run the binary directly to pass environment variables (using `open` will not forward them):
 
 ```bash
-../../target/debug/bundle/macos/webauthn.app/Contents/MacOS/webauthn
+src-tauri/target/debug/bundle/macos/webauthn.app/Contents/MacOS/webauthn
 ```
 
 ### iOS
@@ -194,6 +194,10 @@ pnpm tauri ios dev --open
 
 ## Notes
 
+- `src-tauri/tauri.conf.json` sets `plugins.passkey.allowedOrigins` to `[]`
+  on purpose: the relying-party origin is editable in the UI, so pinning it would
+  break the example. A real app should list its origin(s) — see the plugin README's
+  [Security model](../tauri-plugin-passkey/README.md#security-model).
 - Registered credentials are persisted to `passkey-store.json` in the app data
   directory, so they survive restarts. Delete that file to reset the demo state.
 - The in-app console shows color-coded log entries for registration/authentication flow.

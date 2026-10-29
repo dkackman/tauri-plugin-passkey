@@ -1,5 +1,5 @@
 use std::{
-    ffi::{c_char, c_uchar, CStr, CString},
+    ffi::{c_char, CStr, CString},
     marker::PhantomData,
     sync::mpsc,
     time::Duration,
@@ -19,38 +19,18 @@ use crate::prf::{
     PrfRegistrationOutput,
 };
 
-use super::Authenticator;
+use super::{bridge_options, Authenticator};
 
 type WebauthnCallback =
     unsafe extern "C" fn(json: *const c_char, error: *const c_char, context: u64);
 
+// `options_json` is browser-shaped WebAuthn options JSON (see
+// `bridge_options`). The Swift exports copy it into a Swift `String` before
+// returning, so it only has to outlive the call.
 extern "C" {
-    fn webauthn_register(
-        domain: *const c_char,
-        challenge_ptr: *const c_uchar,
-        challenge_len: usize,
-        username: *const c_char,
-        display_name: *const c_char,
-        user_id_ptr: *const c_uchar,
-        user_id_len: usize,
-        exclude_credentials_json: *const c_char,
-        prf_enabled: u8,
-        context: u64,
-        callback: WebauthnCallback,
-    );
+    fn webauthn_register(options_json: *const c_char, context: u64, callback: WebauthnCallback);
 
-    fn webauthn_authenticate(
-        domain: *const c_char,
-        challenge_ptr: *const c_uchar,
-        challenge_len: usize,
-        allow_credentials_json: *const c_char,
-        prf_salt1_ptr: *const c_uchar,
-        prf_salt1_len: usize,
-        prf_salt2_ptr: *const c_uchar,
-        prf_salt2_len: usize,
-        context: u64,
-        callback: WebauthnCallback,
-    );
+    fn webauthn_authenticate(options_json: *const c_char, context: u64, callback: WebauthnCallback);
 
     fn webauthn_free_string(ptr: *mut c_char);
     fn webauthn_cancel();
@@ -80,52 +60,16 @@ impl<R: Runtime> Authenticator<R> for Webauthn<R> {
         prf: Option<PrfRegistrationInput>,
         timeout: u32,
     ) -> crate::Result<(RegisterPublicKeyCredential, Option<PrfRegistrationOutput>)> {
-        let domain = to_cstring(options.rp.id.as_str())?;
-        let challenge = options.challenge.as_slice();
-        let username = to_cstring(options.user.name.as_str())?;
-        let display_name = to_cstring(options.user.display_name.as_str())?;
-
-        let exclude_creds_json = {
-            let ids: Vec<String> = options
-                .exclude_credentials
-                .iter()
-                .flatten()
-                .map(|c| base64_url_encode(c.id.as_slice()))
-                .collect();
-            if ids.is_empty() {
-                None
-            } else {
-                Some(to_cstring(&serde_json::to_string(&ids)?)?)
-            }
-        };
-        // SAFETY: same invariant as allow_creds_json in `authenticate` — the
-        // Swift export copies this into a Swift String before returning.
-        let exclude_ptr = exclude_creds_json
-            .as_deref()
-            .map(|c| c.as_ptr())
-            .unwrap_or(std::ptr::null());
-        let user_id = options.user.id.as_slice();
-
-        let prf_enabled: u8 = u8::from(prf.is_some());
+        let options_json = to_cstring(&bridge_options::register_options_json(
+            &options, prf, timeout,
+        )?)?;
 
         let (sender, receiver) = mpsc::channel::<Result<String, String>>();
         let context = Box::into_raw(Box::new(sender)) as u64;
 
-        unsafe {
-            webauthn_register(
-                domain.as_ptr(),
-                challenge.as_ptr(),
-                challenge.len(),
-                username.as_ptr(),
-                display_name.as_ptr(),
-                user_id.as_ptr(),
-                user_id.len(),
-                exclude_ptr,
-                prf_enabled,
-                context,
-                ffi_callback,
-            );
-        }
+        // SAFETY: `options_json` outlives the call; Swift copies it before
+        // returning. `context` is reclaimed exactly once by `ffi_callback`.
+        unsafe { webauthn_register(options_json.as_ptr(), context, ffi_callback) };
 
         let json = await_swift_result(receiver, timeout)?;
         let v: serde_json::Value = serde_json::from_str(&json)?;
@@ -143,62 +87,19 @@ impl<R: Runtime> Authenticator<R> for Webauthn<R> {
         prf: Option<PrfAuthenticationInput>,
         timeout: u32,
     ) -> crate::Result<(PublicKeyCredential, Option<PrfAuthenticationOutput>)> {
-        let domain = to_cstring(options.rp_id.as_str())?;
-        let challenge = options.challenge.as_slice();
-
-        let allow_creds_json = {
-            let ids: Vec<String> = options
-                .allow_credentials
-                .iter()
-                .map(|c| base64_url_encode(c.id.as_slice()))
-                .collect();
-            if ids.is_empty() {
-                None
-            } else {
-                Some(to_cstring(&serde_json::to_string(&ids)?)?)
-            }
-        };
-
-        // SAFETY: `allow_creds_json` outlives the `webauthn_authenticate` call below.
-        // The Swift `webauthn_authenticate` export immediately copies this pointer into
-        // a Swift `String` before launching its async Task, so the pointer is not used
-        // after this function returns. If the Swift implementation ever changes to
-        // escape the pointer asynchronously, this becomes unsound.
-        let creds_ptr = allow_creds_json
-            .as_deref()
-            .map(|c| c.as_ptr())
-            .unwrap_or(std::ptr::null());
-
         // ASAuthorization applies the WebAuthn PRF derivation itself, so the
         // browser-level salts go across the FFI boundary unchanged.
-        let (salt1_ptr, salt1_len) = prf
-            .as_ref()
-            .map(|p| (p.first.as_ptr(), p.first.len()))
-            .unwrap_or((std::ptr::null(), 0));
-
-        let (salt2_ptr, salt2_len) = prf
-            .as_ref()
-            .and_then(|p| p.second.as_ref())
-            .map(|s| (s.as_ptr(), s.len()))
-            .unwrap_or((std::ptr::null(), 0));
+        let options_json = to_cstring(&bridge_options::authenticate_options_json(
+            &options,
+            prf.as_ref(),
+            timeout,
+        )?)?;
 
         let (sender, receiver) = mpsc::channel::<Result<String, String>>();
         let context = Box::into_raw(Box::new(sender)) as u64;
 
-        unsafe {
-            webauthn_authenticate(
-                domain.as_ptr(),
-                challenge.as_ptr(),
-                challenge.len(),
-                creds_ptr,
-                salt1_ptr,
-                salt1_len,
-                salt2_ptr,
-                salt2_len,
-                context,
-                ffi_callback,
-            );
-        }
+        // SAFETY: as in `register`.
+        unsafe { webauthn_authenticate(options_json.as_ptr(), context, ffi_callback) };
 
         let json = await_swift_result(receiver, timeout)?;
         let v: serde_json::Value = serde_json::from_str(&json)?;
@@ -231,12 +132,40 @@ unsafe extern "C" fn ffi_callback(json: *const c_char, error: *const c_char, con
     let _ = sender.send(result);
 }
 
+/// Structured error the Swift bridge reports: `{"code": ..., "message": ...}`,
+/// with `code` omitted when Swift has no machine-readable code for it.
+#[derive(serde::Deserialize)]
+struct BridgeError {
+    code: Option<String>,
+    message: String,
+}
+
+/// Map a Swift bridge error string to a structured error. JSON with a known
+/// `code` becomes its matching kind; JSON with an unknown code keeps its
+/// message as an authenticator error; a plain string is passed through as one.
+fn swift_error(s: String) -> crate::Error {
+    match serde_json::from_str::<BridgeError>(&s) {
+        Ok(BridgeError { code, message }) => {
+            crate::error::error_from_code(code.as_deref(), &message)
+                .unwrap_or(crate::Error::Authenticator(message))
+        }
+        Err(_) => crate::Error::Authenticator(s),
+    }
+}
+
+/// Grace period past the RP timeout before Rust gives up on Swift. The Swift
+/// handler dismisses its own sheet at `timeout` and reports a `timeout` code;
+/// this backstop only fires if that callback never arrives.
+const SWIFT_TIMEOUT_GRACE_MS: u64 = 2000;
+
 fn await_swift_result(
     receiver: mpsc::Receiver<Result<String, String>>,
     timeout: u32,
 ) -> crate::Result<String> {
     receiver
-        .recv_timeout(Duration::from_millis(timeout as u64))
+        .recv_timeout(Duration::from_millis(
+            u64::from(timeout) + SWIFT_TIMEOUT_GRACE_MS,
+        ))
         .map_err(|e| {
             // The user never answered the sheet — tear it down so it does not
             // linger after we have already reported failure to the webview.
@@ -246,7 +175,7 @@ fn await_swift_result(
         .map_err(|e| {
             #[cfg(feature = "log")]
             log::error!("Failed to complete passkey operation: {e}");
-            crate::Error::Authenticator(e)
+            swift_error(e)
         })
 }
 
@@ -264,9 +193,11 @@ fn json_str(v: &serde_json::Value, key: &str) -> crate::Result<String> {
 }
 
 fn json_bytes(v: &serde_json::Value, key: &str) -> crate::Result<Vec<u8>> {
-    base64_url_decode(v[key].as_str().ok_or(crate::Error::Authenticator(format!(
+    let encoded = v[key].as_str().ok_or(crate::Error::Authenticator(format!(
         "Missing JSON field: {key}"
-    )))?)
+    )))?;
+    crate::base64url::decode(encoded)
+        .map_err(|e| crate::Error::Io(std::io::Error::new(std::io::ErrorKind::InvalidData, e)))
 }
 
 fn parse_registration_response(
@@ -302,7 +233,7 @@ fn parse_authentication_response(v: &serde_json::Value) -> crate::Result<PublicK
     let signature = json_bytes(response, "signature")?;
     let user_handle = response["userHandle"]
         .as_str()
-        .and_then(|s| base64_url_decode(s).ok());
+        .and_then(|s| crate::base64url::decode(s).ok());
 
     Ok(PublicKeyCredential {
         id,
@@ -318,36 +249,56 @@ fn parse_authentication_response(v: &serde_json::Value) -> crate::Result<PublicK
     })
 }
 
-fn base64_url_decode(input: &str) -> crate::Result<Vec<u8>> {
-    use base64::engine::general_purpose::URL_SAFE_NO_PAD;
-    use base64::Engine;
-    URL_SAFE_NO_PAD
-        .decode(input)
-        .map_err(|e| crate::Error::Io(std::io::Error::new(std::io::ErrorKind::InvalidData, e)))
-}
-
-fn base64_url_encode(input: &[u8]) -> String {
-    use base64::engine::general_purpose::URL_SAFE_NO_PAD;
-    use base64::Engine;
-    URL_SAFE_NO_PAD.encode(input)
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
 
-    #[test]
-    fn base64_url_round_trips() {
-        let bytes = [0u8, 1, 2, 250, 251, 252, 253, 254, 255];
-        let encoded = base64_url_encode(&bytes);
-        // URL-safe, unpadded: no '+', '/', or '=' may appear.
-        assert!(!encoded.contains('+') && !encoded.contains('/') && !encoded.contains('='));
-        assert_eq!(base64_url_decode(&encoded).unwrap(), bytes);
+    // These go through `swift_error` rather than `await_swift_result`: the
+    // latter references the Swift FFI, and pulling the Swift runtime into the
+    // test binary needs an rpath the test harness does not set.
+    fn swift_result(result: Result<String, String>) -> crate::Result<String> {
+        result.map_err(swift_error)
     }
 
     #[test]
-    fn base64_url_decode_rejects_invalid_input() {
-        assert!(base64_url_decode("not valid base64!!!").is_err());
+    fn swift_error_json_with_cancelled_code_maps_to_cancelled() {
+        let err = swift_result(Err(
+            r#"{"code":"cancelled","message":"The operation was canceled."}"#.into(),
+        ))
+        .unwrap_err();
+        assert!(matches!(err, crate::Error::Cancelled));
+    }
+
+    #[test]
+    fn swift_error_json_with_unsupported_code_maps_to_unsupported() {
+        let err =
+            swift_result(Err(r#"{"code":"unsupported","message":"no PRF"}"#.into())).unwrap_err();
+        assert!(matches!(err, crate::Error::Unsupported(m) if m == "no PRF"));
+    }
+
+    #[test]
+    fn swift_error_json_with_unknown_code_keeps_message_as_authenticator() {
+        let err = swift_result(Err(r#"{"code":"failed","message":"boom"}"#.into())).unwrap_err();
+        assert!(matches!(err, crate::Error::Authenticator(m) if m == "boom"));
+    }
+
+    #[test]
+    fn swift_error_json_without_code_keeps_message_as_authenticator() {
+        let err = swift_result(Err(r#"{"message":"boom"}"#.into())).unwrap_err();
+        assert!(matches!(err, crate::Error::Authenticator(m) if m == "boom"));
+    }
+
+    #[test]
+    fn swift_error_json_with_timeout_code_keeps_message() {
+        let err =
+            swift_result(Err(r#"{"code":"timeout","message":"timed out"}"#.into())).unwrap_err();
+        assert!(matches!(err, crate::Error::Authenticator(m) if m == "timed out"));
+    }
+
+    #[test]
+    fn swift_error_plain_string_stays_authenticator() {
+        let err = swift_result(Err("something broke".into())).unwrap_err();
+        assert!(matches!(err, crate::Error::Authenticator(m) if m == "something broke"));
     }
 
     #[test]
@@ -364,9 +315,9 @@ mod tests {
         let cdj = [40u8, 50, 60];
         let json = format!(
             r#"{{"id":"credA","rawId":"{}","response":{{"attestationObject":"{}","clientDataJSON":"{}"}},"prf":{{"enabled":true}}}}"#,
-            base64_url_encode(&raw_id),
-            base64_url_encode(&att),
-            base64_url_encode(&cdj),
+            crate::base64url::encode(&raw_id),
+            crate::base64url::encode(&att),
+            crate::base64url::encode(&cdj),
         );
         let v: serde_json::Value = serde_json::from_str(&json).unwrap();
 
@@ -387,9 +338,9 @@ mod tests {
     fn parses_registration_response_without_prf() {
         let json = format!(
             r#"{{"id":"credB","rawId":"{}","response":{{"attestationObject":"{}","clientDataJSON":"{}"}}}}"#,
-            base64_url_encode(&[1u8]),
-            base64_url_encode(&[2u8]),
-            base64_url_encode(&[3u8]),
+            crate::base64url::encode(&[1u8]),
+            crate::base64url::encode(&[2u8]),
+            crate::base64url::encode(&[3u8]),
         );
         let v: serde_json::Value = serde_json::from_str(&json).unwrap();
 
@@ -402,9 +353,9 @@ mod tests {
     fn registration_response_missing_id_is_an_error() {
         let json = format!(
             r#"{{"rawId":"{}","response":{{"attestationObject":"{}","clientDataJSON":"{}"}}}}"#,
-            base64_url_encode(&[1u8]),
-            base64_url_encode(&[2u8]),
-            base64_url_encode(&[3u8]),
+            crate::base64url::encode(&[1u8]),
+            crate::base64url::encode(&[2u8]),
+            crate::base64url::encode(&[3u8]),
         );
         let v: serde_json::Value = serde_json::from_str(&json).unwrap();
 
@@ -423,13 +374,13 @@ mod tests {
         let prf_second = [6u8; 32];
         let json = format!(
             r#"{{"id":"credC","rawId":"{}","response":{{"authenticatorData":"{}","clientDataJSON":"{}","signature":"{}","userHandle":"{}"}},"prf":{{"first":"{}","second":"{}"}}}}"#,
-            base64_url_encode(&raw_id),
-            base64_url_encode(&auth_data),
-            base64_url_encode(&cdj),
-            base64_url_encode(&sig),
-            base64_url_encode(&user_handle),
-            base64_url_encode(&prf_first),
-            base64_url_encode(&prf_second),
+            crate::base64url::encode(&raw_id),
+            crate::base64url::encode(&auth_data),
+            crate::base64url::encode(&cdj),
+            crate::base64url::encode(&sig),
+            crate::base64url::encode(&user_handle),
+            crate::base64url::encode(&prf_first),
+            crate::base64url::encode(&prf_second),
         );
         let v: serde_json::Value = serde_json::from_str(&json).unwrap();
 
@@ -452,11 +403,11 @@ mod tests {
         let prf_first = [7u8; 32];
         let json = format!(
             r#"{{"id":"credD","rawId":"{}","response":{{"authenticatorData":"{}","clientDataJSON":"{}","signature":"{}"}},"prf":{{"first":"{}"}}}}"#,
-            base64_url_encode(&[1u8]),
-            base64_url_encode(&[2u8]),
-            base64_url_encode(&[3u8]),
-            base64_url_encode(&[4u8]),
-            base64_url_encode(&prf_first),
+            crate::base64url::encode(&[1u8]),
+            crate::base64url::encode(&[2u8]),
+            crate::base64url::encode(&[3u8]),
+            crate::base64url::encode(&[4u8]),
+            crate::base64url::encode(&prf_first),
         );
         let v: serde_json::Value = serde_json::from_str(&json).unwrap();
 
@@ -473,10 +424,10 @@ mod tests {
     fn authentication_response_without_prf_has_no_hmac_output() {
         let json = format!(
             r#"{{"id":"credE","rawId":"{}","response":{{"authenticatorData":"{}","clientDataJSON":"{}","signature":"{}"}}}}"#,
-            base64_url_encode(&[1u8]),
-            base64_url_encode(&[2u8]),
-            base64_url_encode(&[3u8]),
-            base64_url_encode(&[4u8]),
+            crate::base64url::encode(&[1u8]),
+            crate::base64url::encode(&[2u8]),
+            crate::base64url::encode(&[3u8]),
+            crate::base64url::encode(&[4u8]),
         );
         let v: serde_json::Value = serde_json::from_str(&json).unwrap();
 
@@ -491,10 +442,10 @@ mod tests {
     fn authentication_response_with_malformed_prf_first_errors() {
         let json = format!(
             r#"{{"id":"credF","rawId":"{}","response":{{"authenticatorData":"{}","clientDataJSON":"{}","signature":"{}"}},"prf":{{"first":"!!!"}}}}"#,
-            base64_url_encode(&[1u8]),
-            base64_url_encode(&[2u8]),
-            base64_url_encode(&[3u8]),
-            base64_url_encode(&[4u8]),
+            crate::base64url::encode(&[1u8]),
+            crate::base64url::encode(&[2u8]),
+            crate::base64url::encode(&[3u8]),
+            crate::base64url::encode(&[4u8]),
         );
         let v: serde_json::Value = serde_json::from_str(&json).unwrap();
 

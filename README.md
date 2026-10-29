@@ -4,6 +4,8 @@ A Tauri plugin providing WebAuthn/FIDO2/passkey authentication for Linux, Window
 macOS, iOS, and Android — a near drop-in replacement for `@simplewebauthn/browser`
 where the app also passes an origin URL to the register and authenticate calls.
 
+See [Acknowledgments](#acknowledgments) for its upstream.
+
 [![npm](https://img.shields.io/npm/v/tauri-plugin-passkey-api)](https://www.npmjs.com/package/tauri-plugin-passkey-api)
 [![Crates.io Downloads (latest version)](https://img.shields.io/crates/dv/tauri-plugin-passkey)](https://crates.io/crates/tauri-plugin-passkey)
 
@@ -24,12 +26,14 @@ A pnpm workspace monorepo:
 | [`tauri-plugin-passkey/`](tauri-plugin-passkey/) | The plugin — Rust core, Swift (iOS/macOS), Kotlin (Android), TS bindings |
 | [`test-app/`](test-app/)                         | A Tauri (SvelteKit) app exercising the plugin on each platform           |
 
-Some internal identifiers (the iOS Swift module `WebauthnPlugin`, the Android
-package `net.kackman.webauthn`) still use the plugin's historical `webauthn` name.
-The published crate/npm package, the directory, and the runtime Tauri plugin identity
-are `passkey` (crate `tauri-plugin-passkey`, npm `tauri-plugin-passkey-api`, invoked
-from JS as `plugin:passkey|<command>`). See [`CLAUDE.md`](CLAUDE.md) for the full
-naming rationale and architecture notes.
+The published names, the directory, and the runtime Tauri plugin identity are
+`passkey`: crate `tauri-plugin-passkey` (Rust path `tauri_plugin_passkey`), npm
+`tauri-plugin-passkey-api`, and Tauri plugin id `passkey` (invoked from JS as
+`plugin:passkey|<command>`, permission `passkey:default`, config key
+`plugins.passkey`). Some native identifiers (the iOS Swift module `WebauthnPlugin`, the macOS
+`WebauthnBridge`, the Android package `net.kackman.webauthn`) still use the plugin's
+historical `webauthn` name. See [`CLAUDE.md`](CLAUDE.md) for the full naming rationale
+and architecture notes.
 
 ## Prerequisites
 
@@ -39,7 +43,7 @@ naming rationale and architecture notes.
 
 Per platform:
 
-- **Linux** — no extra setup; uses a CTAP2 authenticator client directly
+- **Linux** — no extra setup; the plugin is a CTAP2 client for USB security keys
 - **iOS / macOS** — Xcode; swiftformat and swiftlint for the lint tasks. macOS also
   needs a provisioning profile with Associated Domains entitlements — see
   [`tauri-plugin-passkey/macos/README.md`](tauri-plugin-passkey/macos/README.md)
@@ -92,7 +96,7 @@ runs the raw binary, which ASAuthorizationController will refuse. Use:
 ```bash
 cd test-app
 ./build-macos-dev.sh
-open src-tauri/target/debug/bundle/macos/test-app.app
+open src-tauri/target/debug/bundle/macos/webauthn.app
 ```
 
 ## Before committing
@@ -103,9 +107,9 @@ pnpm lint     # Rust, Swift, Kotlin and JS lints
 pnpm build    # Everything builds
 ```
 
-Rust tests run with `pnpm test:rust` (on macOS, `tauri-plugin-passkey/scripts/test-macos.sh`
-sets up the right toolchain); Android with `pnpm test:android` (after the `.tauri`
-materialization step above); iOS with `pnpm test:swift`.
+Rust tests run with `pnpm test:rust` (on macOS, run `tauri-plugin-passkey/scripts/test-macos.sh`
+instead, which sets up the right toolchain); Android with `pnpm test:android` (after the
+`.tauri` materialization step above, with a JDK 17–24); iOS with `pnpm test:swift`.
 
 ## Security
 
