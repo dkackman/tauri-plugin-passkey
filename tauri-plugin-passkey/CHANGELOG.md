@@ -24,6 +24,7 @@ relative to `tauri-plugin-webauthn` 0.2.0.
   `clientExtensionResults.prf` out. `hmacCreateSecret` / `hmacGetSecret`,
   `prf.evalByCredential` and `prf.eval` at registration are rejected with `unsupported`.
 - Minimum OS versions are now macOS 14 and iOS 17.4.
+- Minimum supported Rust version is 1.88.
 - License is Apache-2.0 (upstream is MIT; its notice is retained in `NOTICE`).
 
 ### 🚀 Features

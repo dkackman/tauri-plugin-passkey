@@ -47,7 +47,8 @@ The `alpha` tag always points at the newest prerelease. While there is no stable
 yet, `latest` is kept in sync with it, but prefer `@alpha` so your intent survives the
 1.0 release.
 
-`@tauri-apps/api` (>= 2.0.0) is a peer dependency of the npm package.
+`@tauri-apps/api` (>= 2.0.0) is a peer dependency of the npm package. The crate needs
+Rust 1.88 or later.
 
 Register the plugin in `src-tauri/src/lib.rs`:
 
